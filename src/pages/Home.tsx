@@ -100,7 +100,7 @@ export default function Home() {
           <h1>
             Entrena. Analiza. <span className="accent">Mejora.</span>
           </h1>
-          <p className="muted">Bots que se adaptan a tu nivel, análisis de tus partidas de chess.com con Stockfish 17.1 y juegos para afinar la visión del tablero. Todo en tu navegador.</p>
+          <p className="muted">Bots que se adaptan a tu nivel, análisis de tus partidas de chess.com con Stockfish 19 y juegos para afinar la visión del tablero. Todo en tu navegador.</p>
           <div className="btn-row">
             <button className="btn primary big" onClick={() => navigate('jugar')}>
               ♟ Jugar contra un bot

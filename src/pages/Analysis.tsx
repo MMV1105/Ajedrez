@@ -32,7 +32,7 @@ export default function Analysis() {
   const [pgnText, setPgnText] = useState('');
 
   const [pgn, setPgn] = useState<string | null>(null);
-  const [depth, setDepth] = useState(() => load('analysisDepth', 16));
+  const [depth, setDepth] = useState(() => load('analysisDepth', 14));
   const [progress, setProgress] = useState<[number, number] | null>(null);
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null);
   const [ply, setPly] = useState(0);
@@ -199,7 +199,7 @@ export default function Analysis() {
               <div className="progress-box">
                 <div className="spinner-knight">♞</div>
                 <p>
-                  Analizando con Stockfish 17.1… {progress[0]}/{progress[1]} posiciones
+                  Analizando con Stockfish 19… {progress[0]}/{progress[1]} posiciones
                 </p>
                 <div className="progress">
                   <div style={{ width: `${(progress[0] / progress[1]) * 100}%` }} />
@@ -309,8 +309,8 @@ export default function Analysis() {
           <div className="chip-row">
             {[
               [12, 'Rápido'],
-              [16, 'Normal'],
-              [20, 'Profundo'],
+              [14, 'Normal'],
+              [18, 'Profundo'],
             ].map(([d, l]) => (
               <button
                 key={d}

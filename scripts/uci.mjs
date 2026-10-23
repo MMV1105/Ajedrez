@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ENGINE = path.join(here, '../node_modules/stockfish/src/stockfish-17.1-lite-single-03e3232.js');
+const ENGINE = path.join(here, '../node_modules/stockfish/bin/stockfish-19-lite-single.js');
 
 export class Engine {
   constructor() {

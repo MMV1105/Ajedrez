@@ -2,7 +2,7 @@
 
 ## Fase 1 · MVP (hecho)
 - Bots con Elo adaptativo y 9 ritmos de juego, Elo por ritmo.
-- Revisión de partidas de chess.com / bots / PGN con Stockfish 17.1: precisión, gráfica y clasificación de jugadas.
+- Revisión de partidas de chess.com / bots / PGN con Stockfish 19: precisión, gráfica y clasificación de jugadas.
 - Puzzles clasificados y contrarreloj, juego de coordenadas, juego de memoria.
 - 7 lecciones interactivas verificadas con el motor.
 - PWA instalable, sonidos y animaciones.

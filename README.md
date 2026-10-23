@@ -1,7 +1,7 @@
 # Jaque · entrenador de ajedrez
 
 App web (instalable como PWA) para practicar y analizar ajedrez sin juego online.
-Todo se ejecuta en el navegador: Stockfish 17.1 (WASM, versión lite de un hilo) en un Web Worker.
+Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) en un Web Worker.
 
 ## Qué incluye el MVP
 

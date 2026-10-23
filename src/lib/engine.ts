@@ -1,4 +1,4 @@
-// Stockfish 17.1 (lite, un hilo) ejecutándose en un Web Worker.
+// Stockfish 19 (lite, un hilo) ejecutándose en un Web Worker.
 
 export type Line = {
   move: string;
@@ -8,7 +8,7 @@ export type Line = {
   depth: number;
 };
 
-const ENGINE_URL = `${import.meta.env.BASE_URL}stockfish/stockfish-17.1-lite-single-03e3232.js`;
+const ENGINE_URL = `${import.meta.env.BASE_URL}stockfish/stockfish-19-lite-single.js`;
 
 export class Engine {
   private worker: Worker;
