@@ -1,0 +1,253 @@
+[
+ {
+  "id": "horquilla",
+  "title": "La horquilla",
+  "icon": "🍴",
+  "level": "Táctica básica",
+  "steps": [
+   {
+    "type": "info",
+    "text": "Una horquilla es un ataque doble: una pieza amenaza dos objetivos a la vez. El rival solo puede salvar uno. El caballo es el rey de las horquillas porque salta y ataca en todas direcciones.",
+    "fen": "r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1",
+    "arrows": [
+     [
+      "c7",
+      "e8"
+     ],
+     [
+      "c7",
+      "a8"
+     ]
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Busca la horquilla de caballo que gana la torre.",
+    "fen": "r3k3/pp3ppp/8/3N4/8/8/PP3PPP/4K3 w - - 0 1",
+    "line": [
+     "d5c7",
+     "e8d8",
+     "c7a8"
+    ],
+    "acceptLast": [
+     "c7a8"
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Los peones también hacen horquillas. Gana una pieza.",
+    "fen": "4k3/pp3ppp/2n1n3/8/3P4/8/PP3PPP/4K3 w - - 0 1",
+    "line": [
+     "d4d5"
+    ],
+    "acceptLast": [
+     "d4d5"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "clavada",
+  "title": "La clavada",
+  "icon": "📌",
+  "level": "Táctica básica",
+  "steps": [
+   {
+    "type": "info",
+    "text": "Una pieza está clavada cuando no puede moverse sin dejar expuesta otra más valiosa detrás. Si detrás está el rey, la clavada es absoluta: ¡ni siquiera es legal moverla!",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/1B2p3/4P3/2N5/PPPP1PPP/R1BQK1NR b KQkq - 0 1",
+    "arrows": [
+     [
+      "b5",
+      "e8"
+     ]
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "El caballo de c6 está clavado al rey. Atácalo con un peón y ganarás una pieza.",
+    "fen": "r3k2r/ppp2ppp/2n5/1B6/3P4/8/PPP2PPP/R3K2R w KQkq - 0 1",
+    "line": [
+     "d4d5"
+    ],
+    "acceptLast": [
+     "d4d5"
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Clava la dama contra su rey con la torre. Perderá la dama por una torre.",
+    "fen": "4k3/pp3ppp/8/4q3/8/8/PP3PPP/3R1K2 w - - 0 1",
+    "line": [
+     "d1e1"
+    ],
+    "acceptLast": [
+     "d1e1"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "pasillo",
+  "title": "Mate del pasillo",
+  "icon": "🚪",
+  "level": "Mates",
+  "steps": [
+   {
+    "type": "info",
+    "text": "Cuando el rey se queda encerrado detrás de sus propios peones, una torre o dama en la última fila da mate. Por eso conviene abrir \"luz\" con h3 o g3 en algún momento.",
+    "fen": "3R2k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    "arrows": [
+     [
+      "d8",
+      "g8"
+     ]
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Mate en 1.",
+    "fen": "6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+    "line": [
+     "d1d8"
+    ],
+    "acceptLast": [
+     "d1d8"
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Mate en 2. Pista: a veces hay que sacrificar la dama.",
+    "fen": "2r3k1/5ppp/8/8/8/8/3Q1PPP/3R2K1 w - - 0 1",
+    "line": [
+     "d2d8",
+     "c8d8",
+     "d1d8"
+    ],
+    "acceptLast": [
+     "d1d8"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "pastor",
+  "title": "Mate del pastor (y cómo evitarlo)",
+  "icon": "🐑",
+  "level": "Aperturas",
+  "steps": [
+   {
+    "type": "info",
+    "text": "El mate del pastor ataca f7, el punto débil del negro al principio: solo lo defiende el rey. La dama y el alfil apuntan a la vez a f7.",
+    "fen": "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3",
+    "arrows": [
+     [
+      "h5",
+      "f7"
+     ],
+     [
+      "c4",
+      "f7"
+     ]
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Juegas con negras. La dama y el alfil amenazan mate en f7. ¡Defiéndete!",
+    "fen": "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3",
+    "line": [
+     "g7g6"
+    ],
+    "acceptLast": [
+     "g7g6",
+     "d8e7",
+     "d8f6",
+     "g8h6"
+    ]
+   },
+   {
+    "type": "puzzle",
+    "text": "Ahora juegas con blancas y el negro no se ha defendido. ¡Mate en 1!",
+    "fen": "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+    "line": [
+     "h5f7"
+    ],
+    "acceptLast": [
+     "h5f7"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "mate-dama",
+  "title": "Mate con rey y dama",
+  "icon": "👑",
+  "level": "Finales",
+  "steps": [
+   {
+    "type": "info",
+    "text": "Con la dama, ve encerrando al rey rival en una caja cada vez más pequeña, moviéndote a un salto de caballo de él. ¡Cuidado con el ahogado! Cuando esté en el borde, acerca tu rey y da mate.",
+    "fen": "8/8/8/4k3/8/8/8/3QK3 w - - 0 1"
+   },
+   {
+    "type": "practice",
+    "text": "Da mate a Stockfish en menos de 20 jugadas.",
+    "fen": "8/8/8/4k3/8/8/8/3QK3 w - - 0 1",
+    "goal": "mate",
+    "maxMoves": 20
+   }
+  ]
+ },
+ {
+  "id": "mate-torre",
+  "title": "Mate con rey y torre",
+  "icon": "🏰",
+  "level": "Finales",
+  "steps": [
+   {
+    "type": "info",
+    "text": "La torre corta al rey por filas o columnas. Usa tu rey para tomar la oposición (reyes enfrentados) y entonces da jaque con la torre para empujarlo hacia el borde.",
+    "fen": "8/8/8/4k3/8/8/8/R3K3 w - - 0 1",
+    "arrows": [
+     [
+      "a1",
+      "a4"
+     ]
+    ]
+   },
+   {
+    "type": "practice",
+    "text": "Da mate a Stockfish en menos de 32 jugadas.",
+    "fen": "8/8/8/4k3/8/8/8/R3K3 w - - 0 1",
+    "goal": "mate",
+    "maxMoves": 32
+   }
+  ]
+ },
+ {
+  "id": "oposicion",
+  "title": "La oposición",
+  "icon": "♔",
+  "level": "Finales",
+  "steps": [
+   {
+    "type": "info",
+    "text": "Dos reyes están en oposición cuando están enfrentados con una casilla en medio. Quien NO tiene que mover \"tiene la oposición\" y obliga al otro a ceder el paso. Es la clave de los finales de peones.",
+    "fen": "8/8/4k3/8/4K3/4P3/8/8 b - - 0 1",
+    "arrows": [
+     [
+      "e4",
+      "e6"
+     ]
+    ]
+   },
+   {
+    "type": "practice",
+    "text": "Corona el peón contra Stockfish. Pista: tu rey debe ir delante del peón.",
+    "fen": "8/8/4k3/8/8/4K3/4P3/8 w - - 0 1",
+    "goal": "promote",
+    "maxMoves": 25
+   }
+  ]
+ }
+]
