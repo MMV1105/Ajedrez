@@ -2,7 +2,6 @@
  {
   "id": "horquilla",
   "title": "La horquilla",
-  "icon": "🍴",
   "level": "Táctica básica",
   "steps": [
    {
@@ -49,7 +48,6 @@
  {
   "id": "clavada",
   "title": "La clavada",
-  "icon": "📌",
   "level": "Táctica básica",
   "steps": [
    {
@@ -90,7 +88,6 @@
  {
   "id": "pasillo",
   "title": "Mate del pasillo",
-  "icon": "🚪",
   "level": "Mates",
   "steps": [
    {
@@ -133,7 +130,6 @@
  {
   "id": "pastor",
   "title": "Mate del pastor (y cómo evitarlo)",
-  "icon": "🐑",
   "level": "Aperturas",
   "steps": [
    {
@@ -181,7 +177,6 @@
  {
   "id": "mate-dama",
   "title": "Mate con rey y dama",
-  "icon": "👑",
   "level": "Finales",
   "steps": [
    {
@@ -201,7 +196,6 @@
  {
   "id": "mate-torre",
   "title": "Mate con rey y torre",
-  "icon": "🏰",
   "level": "Finales",
   "steps": [
    {
@@ -227,7 +221,6 @@
  {
   "id": "oposicion",
   "title": "La oposición",
-  "icon": "♔",
   "level": "Finales",
   "steps": [
    {

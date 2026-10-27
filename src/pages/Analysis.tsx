@@ -5,6 +5,7 @@ import EvalBar from '../components/EvalBar';
 import EvalGraph from '../components/EvalGraph';
 import MoveList from '../components/MoveList';
 import AnimatedNumber from '../components/AnimatedNumber';
+import Icon from '../components/Icon';
 import { Engine } from '../lib/engine';
 import { analyzeGame, CLASS_INFO, formatEval, type Classification, type GameAnalysis } from '../lib/analysis';
 import { fetchArchives, fetchMonth, monthLabel, resultFor, type ChessComGame } from '../lib/chesscom';
@@ -150,8 +151,9 @@ export default function Analysis() {
       <div className="page analysis-page">
         <div className="board-col">
           <div className="player-bar small">
-            <span>
-              {flip ? '♔' : '♚'} {flip ? white : black} {header(pgn, flip ? 'WhiteElo' : 'BlackElo') && `(${header(pgn, flip ? 'WhiteElo' : 'BlackElo')})`}
+            <span className="player-id">
+              <span className={`monogram ${flip ? 'w' : 'b'}`}>{(flip ? white : black).slice(0, 1).toUpperCase()}</span>
+              {flip ? white : black} <span className="player-rating">{header(pgn, flip ? 'WhiteElo' : 'BlackElo')}</span>
             </span>
           </div>
           <div className="board-with-eval">
@@ -165,23 +167,34 @@ export default function Analysis() {
             />
           </div>
           <div className="player-bar small">
-            <span>
-              {flip ? '♚' : '♔'} {flip ? black : white} {header(pgn, flip ? 'BlackElo' : 'WhiteElo') && `(${header(pgn, flip ? 'BlackElo' : 'WhiteElo')})`}
+            <span className="player-id">
+              <span className={`monogram ${flip ? 'b' : 'w'}`}>{(flip ? black : white).slice(0, 1).toUpperCase()}</span>
+              {flip ? black : white} <span className="player-rating">{header(pgn, flip ? 'BlackElo' : 'WhiteElo')}</span>
             </span>
           </div>
           <div className="btn-row center nav-buttons">
-            <button className="btn" onClick={() => go(0)}>⏮</button>
-            <button className="btn" onClick={() => go(ply - 1)}>◀</button>
-            <button className="btn" onClick={() => go(ply + 1)}>▶</button>
-            <button className="btn" onClick={() => go(total)}>⏭</button>
-            <button className="btn ghost" onClick={() => setFlip(!flip)}>⇅</button>
+            <button className="btn icon-btn" aria-label="Inicio" onClick={() => go(0)}>
+              <Icon name="first" />
+            </button>
+            <button className="btn icon-btn" aria-label="Anterior" onClick={() => go(ply - 1)}>
+              <Icon name="prev" />
+            </button>
+            <button className="btn icon-btn" aria-label="Siguiente" onClick={() => go(ply + 1)}>
+              <Icon name="next" />
+            </button>
+            <button className="btn icon-btn" aria-label="Final" onClick={() => go(total)}>
+              <Icon name="last" />
+            </button>
+            <button className="btn icon-btn ghost" aria-label="Girar tablero" onClick={() => setFlip(!flip)}>
+              <Icon name="flip" />
+            </button>
           </div>
         </div>
 
         <aside className="side-panel">
-          <div className="card">
+          <div className="panel">
             <div className="row-between">
-              <h2>Revisión de la partida</h2>
+              <h2 className="panel-title">Revisión</h2>
               <button
                 className="btn ghost small"
                 onClick={() => {
@@ -191,13 +204,12 @@ export default function Analysis() {
                   setProgress(null);
                 }}
               >
-                ← Volver
+                Otra partida
               </button>
             </div>
 
             {progress && (
               <div className="progress-box">
-                <div className="spinner-knight">♞</div>
                 <p>
                   Analizando con Stockfish 19… {progress[0]}/{progress[1]} posiciones
                 </p>
@@ -216,7 +228,10 @@ export default function Analysis() {
                       <span className="acc-num">
                         <AnimatedNumber from={0} to={analysis.accuracy[c]} decimals={1} />
                       </span>
-                      <span className="muted small">precisión</span>
+                      <span className="small">precisión</span>
+                      <span className="small pressure-line" title="Jugadas que dejan al rival con una sola respuesta buena">
+                        presión {analysis.pressure[c].toFixed(0)} %
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -357,7 +372,7 @@ export default function Analysis() {
                   <span className={`result-pill ${r}`}>{r === 'win' ? 'V' : r === 'loss' ? 'D' : 'T'}</span>
                   <span className="game-main">
                     <strong>
-                      {meWhite ? '♔' : '♚'} vs {opp.username} ({opp.rating})
+                        <span className={`color-dot ${meWhite ? 'w' : 'b'}`} /> {opp.username} ({opp.rating})
                     </strong>
                     <span className="muted small">
                       {g.time_class} · {new Date(g.end_time * 1000).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} · tu Elo {me.rating}
@@ -383,7 +398,7 @@ export default function Analysis() {
                   <span className={`result-pill ${r}`}>{r === 'win' ? 'V' : r === 'loss' ? 'D' : 'T'}</span>
                   <span className="game-main">
                     <strong>
-                      {g.color === 'w' ? '♔' : '♚'} vs bot {g.botElo}
+                      <span className={`color-dot ${g.color}`} /> Bot de {g.botElo}
                     </strong>
                     <span className="muted small">
                       {g.tc} · {new Date(g.date).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}

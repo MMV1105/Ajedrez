@@ -10,7 +10,6 @@ const L = [
   {
     id: 'horquilla',
     title: 'La horquilla',
-    icon: '🍴',
     level: 'Táctica básica',
     steps: [
       { type: 'info', text: 'Una horquilla es un ataque doble: una pieza amenaza dos objetivos a la vez. El rival solo puede salvar uno. El caballo es el rey de las horquillas porque salta y ataca en todas direcciones.', fen: 'r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1', arrows: [['c7', 'e8'], ['c7', 'a8']] },
@@ -21,7 +20,6 @@ const L = [
   {
     id: 'clavada',
     title: 'La clavada',
-    icon: '📌',
     level: 'Táctica básica',
     steps: [
       { type: 'info', text: 'Una pieza está clavada cuando no puede moverse sin dejar expuesta otra más valiosa detrás. Si detrás está el rey, la clavada es absoluta: ¡ni siquiera es legal moverla!', fen: 'r1bqk2r/pppp1ppp/2n2n2/1B2p3/4P3/2N5/PPPP1PPP/R1BQK1NR b KQkq - 0 1', arrows: [['b5', 'e8']] },
@@ -32,7 +30,6 @@ const L = [
   {
     id: 'pasillo',
     title: 'Mate del pasillo',
-    icon: '🚪',
     level: 'Mates',
     steps: [
       { type: 'info', text: 'Cuando el rey se queda encerrado detrás de sus propios peones, una torre o dama en la última fila da mate. Por eso conviene abrir "luz" con h3 o g3 en algún momento.', fen: '3R2k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1', arrows: [['d8', 'g8']] },
@@ -43,7 +40,6 @@ const L = [
   {
     id: 'pastor',
     title: 'Mate del pastor (y cómo evitarlo)',
-    icon: '🐑',
     level: 'Aperturas',
     steps: [
       { type: 'info', text: 'El mate del pastor ataca f7, el punto débil del negro al principio: solo lo defiende el rey. La dama y el alfil apuntan a la vez a f7.', fen: 'r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3', arrows: [['h5', 'f7'], ['c4', 'f7']] },
@@ -54,7 +50,6 @@ const L = [
   {
     id: 'mate-dama',
     title: 'Mate con rey y dama',
-    icon: '👑',
     level: 'Finales',
     steps: [
       { type: 'info', text: 'Con la dama, ve encerrando al rey rival en una caja cada vez más pequeña, moviéndote a un salto de caballo de él. ¡Cuidado con el ahogado! Cuando esté en el borde, acerca tu rey y da mate.', fen: '8/8/8/4k3/8/8/8/3QK3 w - - 0 1' },
@@ -64,7 +59,6 @@ const L = [
   {
     id: 'mate-torre',
     title: 'Mate con rey y torre',
-    icon: '🏰',
     level: 'Finales',
     steps: [
       { type: 'info', text: 'La torre corta al rey por filas o columnas. Usa tu rey para tomar la oposición (reyes enfrentados) y entonces da jaque con la torre para empujarlo hacia el borde.', fen: '8/8/8/4k3/8/8/8/R3K3 w - - 0 1', arrows: [['a1', 'a4']] },
@@ -74,7 +68,6 @@ const L = [
   {
     id: 'oposicion',
     title: 'La oposición',
-    icon: '♔',
     level: 'Finales',
     steps: [
       { type: 'info', text: 'Dos reyes están en oposición cuando están enfrentados con una casilla en medio. Quien NO tiene que mover "tiene la oposición" y obliga al otro a ceder el paso. Es la clave de los finales de peones.', fen: '8/8/4k3/8/4K3/4P3/8/8 b - - 0 1', arrows: [['e4', 'e6']] },

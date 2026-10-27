@@ -21,8 +21,8 @@ type Props = {
   maxWidth?: number;
 };
 
-export const BOARD_LIGHT = '#e8dcc4';
-export const BOARD_DARK = '#7a8fa8';
+export const BOARD_LIGHT = '#ecd8b4';
+export const BOARD_DARK = '#ad8259';
 
 export default function Board({
   position,
@@ -71,7 +71,7 @@ export default function Board({
 
   const styles: Record<string, CSSProperties> = {};
   if (lastMove) {
-    for (const sq of lastMove) styles[sq] = { background: 'rgba(255, 214, 79, 0.45)' };
+    for (const sq of lastMove) styles[sq] = { background: 'rgba(205, 210, 106, 0.6)' };
   }
   if (chess?.inCheck()) {
     const king = chess
@@ -80,7 +80,7 @@ export default function Board({
       .find((p) => p && p.type === 'k' && p.color === chess.turn());
     if (king) styles[king.square] = { background: 'radial-gradient(circle, rgba(255,40,40,.9) 0%, rgba(255,40,40,.35) 55%, transparent 75%)' };
   }
-  if (selected) styles[selected] = { ...styles[selected], background: 'rgba(120, 200, 255, 0.55)' };
+  if (selected) styles[selected] = { ...styles[selected], background: 'rgba(20, 85, 30, 0.45)' };
   for (const t of targets) {
     styles[t.to] = {
       ...styles[t.to],
@@ -153,7 +153,7 @@ export default function Board({
           showBoardNotation={showNotation}
           customLightSquareStyle={{ backgroundColor: BOARD_LIGHT }}
           customDarkSquareStyle={{ backgroundColor: BOARD_DARK }}
-          customBoardStyle={{ borderRadius: 6, boxShadow: '0 12px 40px rgba(0,0,0,.45)' }}
+          customBoardStyle={{ borderRadius: 3, boxShadow: '0 6px 24px rgba(0,0,0,.35)' }}
           customDropSquareStyle={{ boxShadow: 'inset 0 0 0 4px rgba(255,214,79,.9)' }}
           areArrowsAllowed
         />

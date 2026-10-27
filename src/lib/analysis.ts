@@ -7,14 +7,14 @@ export const CLASS_INFO: Record<Classification, { label: string; color: string; 
   brillante: { label: 'Brillante', color: '#26c2a3', icon: '!!' },
   gran: { label: 'Gran jugada', color: '#5c8bb0', icon: '!' },
   mejor: { label: 'Mejor', color: '#81b64c', icon: '★' },
-  excelente: { label: 'Excelente', color: '#96bc4b', icon: '👍' },
+  excelente: { label: 'Excelente', color: '#96bc4b', icon: '+' },
   buena: { label: 'Buena', color: '#97af8b', icon: '✓' },
   imprecision: { label: 'Imprecisión', color: '#f7c631', icon: '?!' },
   error: { label: 'Error', color: '#ffa459', icon: '?' },
   grave: { label: 'Error grave', color: '#fa412d', icon: '??' },
 };
 
-export type PositionEval = { cp: number; mate: number | null; best: string | null; second: number | null; pv: string[] };
+export type PositionEval = { cp: number; mate: number | null; best: string | null; second: number | null; pv: string[]; goodMoves: number };
 
 export type AnalyzedMove = {
   move: Move;
@@ -26,13 +26,16 @@ export type AnalyzedMove = {
   winBefore: number; // % de victoria del que mueve
   winAfter: number;
   accuracy: number;
+  cpLoss: number;
   cls: Classification;
+  pressure: boolean; // dejó al rival con una sola jugada buena
 };
 
 export type GameAnalysis = {
   moves: AnalyzedMove[];
   evals: PositionEval[]; // por posición, desde blancas
   accuracy: { w: number; b: number };
+  pressure: { w: number; b: number }; // % de jugadas que dejan al rival con una sola respuesta buena
 };
 
 // Probabilidad de ganar (fórmula de lichess) desde la evaluación en centipeones.
@@ -55,21 +58,78 @@ function materialFor(fen: string, color: 'w' | 'b') {
   return m;
 }
 
-async function evalPosition(engine: Engine, fen: string, depth: number): Promise<PositionEval> {
+// Margen (en centipeones) para considerar "buena" una respuesta del rival.
+const GOOD_REPLY_MARGIN = 60;
+
+export async function evalPosition(engine: Engine, fen: string, depth: number): Promise<PositionEval> {
   const chess = new Chess(fen);
   const whiteToMove = chess.turn() === 'w';
-  if (chess.isCheckmate()) return { cp: whiteToMove ? -10000 : 10000, mate: 0, best: null, second: null, pv: [] };
-  if (chess.isDraw() || chess.isStalemate()) return { cp: 0, mate: null, best: null, second: null, pv: [] };
-  const lines: Line[] = await engine.analyse(fen, { depth, multipv: 2 });
+  if (chess.isCheckmate()) return { cp: whiteToMove ? -10000 : 10000, mate: 0, best: null, second: null, pv: [], goodMoves: 0 };
+  if (chess.isDraw() || chess.isStalemate()) return { cp: 0, mate: null, best: null, second: null, pv: [], goodMoves: 0 };
+  const lines: Line[] = await engine.analyse(fen, { depth, multipv: 3 });
   const sign = whiteToMove ? 1 : -1;
   const [a, b] = lines;
+  const top = scoreOf(a);
   return {
-    cp: sign * scoreOf(a),
+    cp: sign * top,
     mate: a.mate === null ? null : sign * a.mate,
     best: a.move,
     second: b ? sign * scoreOf(b) : null,
     pv: a.pv,
+    goodMoves: lines.filter((l) => top - scoreOf(l) <= GOOD_REPLY_MARGIN).length,
   };
+}
+
+const clampCp = (v: number) => Math.max(-1000, Math.min(1000, v));
+
+// Nota de una jugada a partir de la evaluación antes y después.
+// Es más exigente que la de Lichess: además de la probabilidad de ganar, cuenta los
+// centipeones perdidos, para que los errores en posiciones ya decididas también resten.
+export function judgeMove(move: Move, before: PositionEval, after: PositionEval) {
+  const color = move.color;
+  const sign = color === 'w' ? 1 : -1;
+  const winBefore = winPct(sign * evalToCp(before));
+  const winAfter = winPct(sign * evalToCp(after));
+  const winLoss = Math.max(0, winBefore - winAfter);
+  const cpLoss = Math.max(0, clampCp(sign * evalToCp(before)) - clampCp(sign * evalToCp(after)));
+  // En posiciones muy decididas un mismo error en centipeones importa algo menos.
+  const level = Math.abs(clampCp(sign * evalToCp(before)));
+  const weight = level <= 300 ? 1 : 1 - ((level - 300) / 700) * 0.65;
+  const loss = Math.max(winLoss, (cpLoss / 12) * weight);
+  const accuracy = Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
+  const uci = move.from + move.to + (move.promotion ?? '');
+  let cls: Classification;
+  if (uci === before.best || (loss < 0.5 && cpLoss <= 5)) {
+    cls = 'mejor';
+    // ¿Única buena jugada? La segunda opción perdía mucho.
+    const secondWin = before.second === null ? null : winPct(sign * before.second);
+    if (secondWin !== null && winBefore - secondWin > 12 && winBefore < 92 && winAfter > 40) cls = 'gran';
+    // Sacrificio que funciona: tras la mejor respuesta queda con menos material y sigue bien.
+    if (move.piece !== 'p' && after.best && winAfter > 50 && winBefore < 97) {
+      const reply = new Chess(move.after);
+      try {
+        reply.move({ from: after.best.slice(0, 2), to: after.best.slice(2, 4), promotion: after.best[4] });
+        if (materialFor(reply.fen(), color) - materialFor(move.before, color) <= -2) cls = 'brillante';
+      } catch {
+        /* jugada del motor no aplicable */
+      }
+    }
+  } else if (loss < 2) cls = 'excelente';
+  else if (loss < 5) cls = 'buena';
+  else if (loss < 10) cls = 'imprecision';
+  else if (loss < 20) cls = 'error';
+  else cls = 'grave';
+  // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
+  const decided = Math.abs(evalToCp(after)) > 600;
+  const pressure = !decided && after.goodMoves === 1 && new Chess(move.after).moves().length > 1;
+  return { winBefore, winAfter, cpLoss, accuracy, cls, pressure };
+}
+
+export function playerAccuracy(xs: number[]) {
+  if (!xs.length) return 0;
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const harmonic = xs.length / xs.reduce((a, b) => a + 1 / Math.max(b, 1), 0);
+  return (mean + harmonic) / 2;
 }
 
 export async function analyzeGame(
@@ -90,58 +150,25 @@ export async function analyzeGame(
     evals.push(await evalPosition(engine, fens[i], depth));
     onProgress(i + 1, fens.length);
   }
-  const moves: AnalyzedMove[] = history.map((move, i) => {
-    const color = move.color;
-    const sign = color === 'w' ? 1 : -1;
-    const before = evals[i];
-    const after = evals[i + 1];
-    const winBefore = winPct(sign * evalToCp(before));
-    const winAfter = winPct(sign * evalToCp(after));
-    const loss = Math.max(0, winBefore - winAfter);
-    const accuracy = Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
-    const uci = move.from + move.to + (move.promotion ?? '');
-    let cls: Classification;
-    if (uci === before.best || loss < 0.5) {
-      cls = 'mejor';
-      // ¿Única buena jugada? La segunda opción perdía mucho.
-      const secondWin = before.second === null ? null : winPct(sign * before.second);
-      if (secondWin !== null && winBefore - secondWin > 12 && winBefore < 92 && winAfter > 40) cls = 'gran';
-      // Sacrificio que funciona: tras la mejor respuesta queda con menos material y sigue bien.
-      if (move.piece !== 'p' && after.best && winAfter > 50 && winBefore < 97) {
-        const reply = new Chess(move.after);
-        try {
-          reply.move({ from: after.best.slice(0, 2), to: after.best.slice(2, 4), promotion: after.best[4] });
-          if (materialFor(reply.fen(), color) - materialFor(move.before, color) <= -2) cls = 'brillante';
-        } catch {
-          /* jugada del motor no aplicable */
-        }
-      }
-    } else if (loss < 2) cls = 'excelente';
-    else if (loss < 5) cls = 'buena';
-    else if (loss < 10) cls = 'imprecision';
-    else if (loss < 20) cls = 'error';
-    else cls = 'grave';
+  const moves: AnalyzedMove[] = history.map((move, i) => ({
+    move,
+    fenBefore: move.before,
+    fenAfter: move.after,
+    color: move.color,
+    evalBefore: evals[i],
+    evalAfter: evals[i + 1],
+    ...judgeMove(move, evals[i], evals[i + 1]),
+  }));
+  const stats = (c: 'w' | 'b') => {
+    const mine = moves.filter((m) => m.color === c);
     return {
-      move,
-      fenBefore: move.before,
-      fenAfter: move.after,
-      color,
-      evalBefore: before,
-      evalAfter: after,
-      winBefore,
-      winAfter,
-      accuracy,
-      cls,
+      accuracy: playerAccuracy(mine.map((m) => m.accuracy)),
+      pressure: mine.length ? (mine.filter((m) => m.pressure).length / mine.length) * 100 : 0,
     };
-  });
-  const acc = (c: 'w' | 'b') => {
-    const xs = moves.filter((m) => m.color === c).map((m) => m.accuracy);
-    if (!xs.length) return 0;
-    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
-    const harmonic = xs.length / xs.reduce((a, b) => a + 1 / Math.max(b, 1), 0);
-    return (mean + harmonic) / 2;
   };
-  return { moves, evals, accuracy: { w: acc('w'), b: acc('b') } };
+  const w = stats('w');
+  const b = stats('b');
+  return { moves, evals, accuracy: { w: w.accuracy, b: b.accuracy }, pressure: { w: w.pressure, b: b.pressure } };
 }
 
 export function formatEval(e: Pick<PositionEval, 'cp' | 'mate'>) {

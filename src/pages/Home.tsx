@@ -48,7 +48,7 @@ function ImportRatings({ onDone }: { onDone: () => void }) {
     }
   }
   return (
-    <form className="card import-card" onSubmit={run}>
+    <form className="import-card" onSubmit={run}>
       <div>
         <strong>¿Empiezas con tu nivel de chess.com?</strong>
         <p className="muted small">Importa tu Elo para que los bots y los puzzles arranquen a tu nivel.</p>
@@ -66,6 +66,7 @@ export default function Home() {
   const [, refresh] = useState(0);
   const [fen, setFen] = useState(new Chess().fen());
   const [last, setLast] = useState<[string, string] | null>(null);
+  const [ply, setPly] = useState(0);
 
   useEffect(() => {
     const chess = new Chess();
@@ -77,75 +78,85 @@ export default function Home() {
           i = 0;
           setFen(chess.fen());
           setLast(null);
+          setPly(0);
           return;
         }
         i++;
         return;
       }
       const mv = chess.move(OPERA[i++]);
+      setPly(i);
       setFen(chess.fen());
       setLast([mv.from, mv.to]);
     }, 1100);
     return () => clearInterval(id);
   }, []);
 
+  const moveLabel = ply ? `${Math.ceil(ply / 2)}.${ply % 2 ? '' : '..'} ${OPERA[ply - 1]}` : 'posición inicial';
   const classes: RatingClass[] = ['bullet', 'blitz', 'rapid', 'puzzles'];
-  const lessonsDone = Object.keys(load<Record<string, boolean>>('lessonsDone', {})).length;
   const fresh = classes.every((c) => getRating(c).games === 0);
+  const profile = load<{ accuracy: number; games: number } | null>('profile', null);
 
   return (
     <div className="page home">
-      <section className="hero">
-        <div className="hero-text">
-          <h1>
-            Entrena. Analiza. <span className="accent">Mejora.</span>
-          </h1>
-          <p className="muted">Bots que se adaptan a tu nivel, análisis de tus partidas de chess.com con Stockfish 19 y juegos para afinar la visión del tablero. Todo en tu navegador.</p>
-          <div className="btn-row">
-            <button className="btn primary big" onClick={() => navigate('jugar')}>
-              ♟ Jugar contra un bot
-            </button>
-            <button className="btn big" onClick={() => navigate('analizar')}>
-              🔍 Analizar mis partidas
-            </button>
-          </div>
-        </div>
-        <div className="hero-board">
-          <Board position={fen} lastMove={last} animation={450} maxWidth={420} showNotation={false} />
-          <p className="muted small center">La partida de la ópera · Morphy, 1858</p>
-        </div>
-      </section>
-
-      <section className="rating-grid">
-        {classes.map((c, i) => {
-          const r = getRating(c);
-          return (
-            <div key={c} className="rating-card" style={{ animationDelay: `${i * 80}ms` }}>
-              <span className="muted small">{RATING_LABELS[c]}</span>
-              <strong className="rating-num">{r.rating}</strong>
-              <Sparkline points={r.history.map((h) => h.r)} />
-              <span className="muted small">{c === 'puzzles' ? `${r.games} resueltos` : `${r.wins}V ${r.draws}T ${r.losses}D`}</span>
-            </div>
-          );
-        })}
-      </section>
-
-      {fresh && <ImportRatings onDone={() => refresh((x) => x + 1)} />}
-
-      <section className="feature-grid">
-        {[
-          ['🧩', 'Puzzles', 'Clasificados y contrarreloj', 'puzzles'],
-          ['🎯', 'Coordenadas', 'Visión rápida del tablero', 'coordenadas'],
-          ['🧠', 'Memoria', 'Recuerda y reconstruye posiciones', 'memoria'],
-          ['📚', 'Lecciones', `${lessonsDone} completadas`, 'lecciones'],
-        ].map(([icon, title, sub, path], i) => (
-          <button key={path} className="feature-card" style={{ animationDelay: `${200 + i * 80}ms` }} onClick={() => navigate(path)}>
-            <span className="feature-icon">{icon}</span>
-            <strong>{title}</strong>
-            <span className="muted small">{sub}</span>
+      <section className="home-main">
+        <header className="page-head">
+          <h1 className="page-title">Buenas, ¿echamos una?</h1>
+          <p className="lede">Juega contra bots a tu nivel, revisa tus partidas de chess.com con Stockfish 19 y entrena la vista del tablero.</p>
+        </header>
+        <div className="btn-row">
+          <button className="btn primary" onClick={() => navigate('jugar')}>
+            Jugar contra un bot
           </button>
-        ))}
+          <button className="btn" onClick={() => navigate('analizar')}>
+            Analizar una partida
+          </button>
+        </div>
+
+        <table className="ratings-table">
+          <thead>
+            <tr>
+              <th>Ritmo</th>
+              <th className="num">Elo</th>
+              <th>Evolución</th>
+              <th className="num">Partidas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {classes.map((c) => {
+              const r = getRating(c);
+              return (
+                <tr key={c}>
+                  <td>{RATING_LABELS[c]}</td>
+                  <td className="num strong">{r.rating}</td>
+                  <td>
+                    <Sparkline points={r.history.map((h) => h.r)} />
+                  </td>
+                  <td className="num muted">{c === 'puzzles' ? r.games : `${r.wins}-${r.draws}-${r.losses}`}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {fresh && <ImportRatings onDone={() => refresh((x) => x + 1)} />}
+
+        <a className="list-link" href="#/perfil">
+          <span>
+            <strong>Perfil de jugador</strong>
+            <span className="muted">{profile ? `Precisión media ${profile.accuracy.toFixed(1)} en ${profile.games} partidas analizadas.` : 'Analiza tus últimas partidas y descubre en qué fallas.'}</span>
+          </span>
+          <span className="list-stat">Ver</span>
+        </a>
       </section>
+
+      <aside className="home-board">
+        <Board position={fen} lastMove={last} animation={450} maxWidth={440} showNotation={false} />
+        <p className="caption">
+          <span>Morphy contra el duque de Brunswick y el conde Isouard</span>
+          <span className="muted">Ópera de París, 1858 · {moveLabel}</span>
+        </p>
+      </aside>
     </div>
   );
 }
