@@ -107,7 +107,7 @@ export default function Coordinates() {
       </div>
       <aside className="side-panel">
         <div className="card">
-          <h2>🎯 Coordenadas</h2>
+          <h2 className="panel-title">Coordenadas</h2>
           <p className="muted small">Pulsa la casilla que aparece en el centro. Tienes {DURATION} segundos.</p>
           {running || finished ? (
             <>
@@ -139,10 +139,10 @@ export default function Coordinates() {
               <label className="field-label">Ver tablero desde</label>
               <div className="chip-row">
                 <button className={`chip ${side === 'white' ? 'on' : ''}`} onClick={() => setSide('white')}>
-                  ♔ Blancas
+                  Blancas
                 </button>
                 <button className={`chip ${side === 'black' ? 'on' : ''}`} onClick={() => setSide('black')}>
-                  ♚ Negras
+                  Negras
                 </button>
               </div>
               <div className="chip-row">

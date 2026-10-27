@@ -216,13 +216,11 @@ export default function Puzzles() {
         <h1 className="page-title">Puzzles</h1>
         <div className="mode-grid">
           <button className="mode-card" onClick={() => start('rated')}>
-            <span className="mode-icon">🧩</span>
-            <strong>Puzzles clasificados</strong>
+                        <strong>Puzzles clasificados</strong>
             <span className="muted small">Tu Elo de puzzles: {rating}. La dificultad se adapta a ti.</span>
           </button>
           <button className="mode-card" onClick={() => start('rush')}>
-            <span className="mode-icon">⚡</span>
-            <strong>Contrarreloj</strong>
+                        <strong>Contrarreloj</strong>
             <span className="muted small">3 minutos, 3 fallos. Cada acierto sube la dificultad. Récord: {best}</span>
           </button>
         </div>
@@ -246,9 +244,9 @@ export default function Puzzles() {
       <aside className="side-panel">
         <div className="card">
           <div className="row-between">
-            <h2>{mode === 'rush' ? '⚡ Contrarreloj' : '🧩 Puzzle'}</h2>
+            <h2 className="panel-title">{mode === 'rush' ? 'Contrarreloj' : 'Puzzle'}</h2>
             <button className="btn ghost small" onClick={() => setMode(null)}>
-              ← Salir
+              Salir
             </button>
           </div>
 
@@ -271,7 +269,7 @@ export default function Puzzles() {
           )}
 
           <div className={`turn-banner ${solverColor}`}>
-            {status === 'solved' ? '¡Correcto! 🎉' : status === 'wrong' ? 'No es eso…' : status === 'revealed' ? 'Solución' : `Juegan las ${solverColor === 'w' ? 'blancas' : 'negras'}`}
+            {status === 'solved' ? '¡Correcto!' : status === 'wrong' ? 'No es eso…' : status === 'revealed' ? 'Solución' : `Juegan las ${solverColor === 'w' ? 'blancas' : 'negras'}`}
           </div>
           <p className="muted small">
             {THEME_LABEL[puzzle.theme] ?? puzzle.theme} · dificultad {puzzle.rating}
@@ -295,7 +293,7 @@ export default function Puzzles() {
               {status === 'solving' && (
                 <>
                   <button className="btn" onClick={() => setHint(true)}>
-                    💡 Pista
+                    Pista
                   </button>
                   <button className="btn ghost" onClick={reveal}>
                     Ver solución

@@ -12,7 +12,7 @@ type Step =
   | { type: 'puzzle'; text: string; fen: string; line: string[]; acceptLast: string[] }
   | { type: 'practice'; text: string; fen: string; goal: 'mate' | 'promote'; maxMoves: number };
 
-type Lesson = { id: string; title: string; icon: string; level: string; steps: Step[] };
+type Lesson = { id: string; title: string; level: string; steps: Step[] };
 const ALL = LESSONS as Lesson[];
 
 export default function Lessons() {
@@ -30,8 +30,7 @@ export default function Lessons() {
             <div className="lesson-grid">
               {ALL.filter((l) => l.level === g).map((l, i) => (
                 <button key={l.id} className={`lesson-card ${done[l.id] ? 'done' : ''}`} style={{ animationDelay: `${i * 60}ms` }} onClick={() => setLessonId(l.id)}>
-                  <span className="lesson-icon">{l.icon}</span>
-                  <strong>{l.title}</strong>
+                                    <strong>{l.title}</strong>
                   <span className="muted small">{l.steps.length} pasos</span>
                   {done[l.id] && <span className="done-badge">✓</span>}
                 </button>
@@ -194,11 +193,9 @@ function LessonPlayer({ lesson, onExit, onComplete }: { lesson: Lesson; onExit: 
       <aside className="side-panel">
         <div className="card">
           <div className="row-between">
-            <h2>
-              {lesson.icon} {lesson.title}
-            </h2>
+            <h2 className="panel-title">{lesson.title}</h2>
             <button className="btn ghost small" onClick={onExit}>
-              ← Lecciones
+              Lecciones
             </button>
           </div>
           <div className="step-dots">

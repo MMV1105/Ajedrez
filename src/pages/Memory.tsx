@@ -136,7 +136,7 @@ export default function Memory() {
       </div>
       <aside className="side-panel">
         <div className="card">
-          <h2>🧠 Memoria</h2>
+          <h2 className="panel-title">Memoria</h2>
           {phase === 'idle' ? (
             <>
               <p className="muted">
@@ -157,7 +157,11 @@ export default function Memory() {
                   <span className="muted small">nivel · {count} piezas</span>
                 </div>
                 <div>
-                  <span className="big-num">{'❤️'.repeat(Math.max(0, lives)) || '—'}</span>
+                  <span className="big-num lives">
+                    {[0, 1, 2].map((i) => (
+                      <span key={i} className={i < lives ? 'life on' : 'life'} />
+                    ))}
+                  </span>
                   <span className="muted small">vidas</span>
                 </div>
               </div>

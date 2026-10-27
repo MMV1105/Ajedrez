@@ -1,4 +1,5 @@
 // Stockfish 19 (lite, un hilo) ejecutándose en un Web Worker.
+import { depthForElo, isNeutral, pickStyled, type BotStyle } from './style';
 
 export type Line = {
   move: string;
@@ -85,7 +86,14 @@ export class Engine {
   }
 
   // Jugada del bot con fuerza aproximada a `elo`.
-  botMove(fen: string, elo: number, movetime: number): Promise<string> {
+  botMove(fen: string, elo: number, movetime: number, style?: BotStyle): Promise<string> {
+    if (style && !isNeutral(style)) {
+      return this.analyse(fen, { depth: depthForElo(elo), multipv: 6 }).then((lines) => {
+        if (!lines.length) return '0000';
+        if (Math.random() < Math.max(0, (1100 - elo) / 3600)) return lines[Math.floor(Math.random() * lines.length)].move;
+        return pickStyled(fen, lines, style, elo);
+      });
+    }
     if (elo >= 1320) {
       return this.run(async () => {
         this.send('setoption name MultiPV value 1');

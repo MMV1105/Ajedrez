@@ -2,20 +2,27 @@ import { useEffect, useState, type ComponentType } from 'react';
 import Home from './pages/Home';
 import Play from './pages/Play';
 import Analysis from './pages/Analysis';
+import Profile from './pages/Profile';
+import Train from './pages/Train';
 import Puzzles from './pages/Puzzles';
 import Coordinates from './pages/Coordinates';
 import Memory from './pages/Memory';
 import Lessons from './pages/Lessons';
+import Icon from './components/Icon';
 import { isMuted, setMuted } from './lib/sound';
 
-const ROUTES: { path: string; label: string; icon: string; page: ComponentType }[] = [
-  { path: '', label: 'Inicio', icon: '🏠', page: Home },
-  { path: 'jugar', label: 'Jugar', icon: '♟', page: Play },
-  { path: 'analizar', label: 'Analizar', icon: '🔍', page: Analysis },
-  { path: 'puzzles', label: 'Puzzles', icon: '🧩', page: Puzzles },
-  { path: 'coordenadas', label: 'Coordenadas', icon: '🎯', page: Coordinates },
-  { path: 'memoria', label: 'Memoria', icon: '🧠', page: Memory },
-  { path: 'lecciones', label: 'Lecciones', icon: '📚', page: Lessons },
+type Route = { path: string; label: string; icon: string; page: ComponentType; group: 'main' | 'train' };
+
+const ROUTES: Route[] = [
+  { path: '', label: 'Inicio', icon: 'home', page: Home, group: 'main' },
+  { path: 'jugar', label: 'Jugar', icon: 'play', page: Play, group: 'main' },
+  { path: 'analizar', label: 'Analizar', icon: 'analyze', page: Analysis, group: 'main' },
+  { path: 'perfil', label: 'Perfil', icon: 'profile', page: Profile, group: 'main' },
+  { path: 'entrenar', label: 'Entrenar', icon: 'puzzle', page: Train, group: 'main' },
+  { path: 'puzzles', label: 'Puzzles', icon: 'puzzle', page: Puzzles, group: 'train' },
+  { path: 'coordenadas', label: 'Coordenadas', icon: 'target', page: Coordinates, group: 'train' },
+  { path: 'memoria', label: 'Memoria', icon: 'memory', page: Memory, group: 'train' },
+  { path: 'lecciones', label: 'Lecciones', icon: 'book', page: Lessons, group: 'train' },
 ];
 
 const current = () => window.location.hash.replace(/^#\/?/, '');
@@ -25,43 +32,53 @@ export default function App() {
   const [muted, setM] = useState(isMuted());
 
   useEffect(() => {
-    const on = () => setPath(current());
+    const on = () => {
+      setPath(current());
+      window.scrollTo(0, 0);
+    };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
 
   const route = ROUTES.find((r) => r.path === path) ?? ROUTES[0];
   const Page = route.page;
+  const isOn = (r: Route) => r === route || (r.path === 'entrenar' && route.group === 'train');
+
+  const link = (r: Route) => (
+    <a key={r.path} href={`#/${r.path}`} className={isOn(r) ? 'on' : ''}>
+      <Icon name={r.icon} />
+      <span>{r.label}</span>
+    </a>
+  );
 
   return (
     <div className="app">
-      <nav className="nav">
-        <a className="logo" href="#/">
-          <span className="logo-mark">♞</span>
-          <span className="logo-text">Jaque</span>
+      <aside className="sidebar">
+        <a className="wordmark" href="#/">
+          Jaque
         </a>
-        <div className="nav-links">
-          {ROUTES.map((r) => (
-            <a key={r.path} href={`#/${r.path}`} className={r === route ? 'on' : ''}>
-              <span className="nav-icon">{r.icon}</span>
-              <span className="nav-label">{r.label}</span>
-            </a>
-          ))}
-        </div>
+        <nav className="side-nav">
+          {ROUTES.filter((r) => r.group === 'main' && r.path !== 'entrenar').map(link)}
+          <span className="side-group">Entrenar</span>
+          {ROUTES.filter((r) => r.group === 'train').map(link)}
+        </nav>
         <button
-          className="mute"
-          title={muted ? 'Activar sonido' : 'Silenciar'}
+          className="sound-toggle"
           onClick={() => {
             setMuted(!muted);
             setM(!muted);
           }}
         >
-          {muted ? '🔇' : '🔊'}
+          <Icon name={muted ? 'mute' : 'sound'} />
+          <span>{muted ? 'Sonido apagado' : 'Sonido'}</span>
         </button>
-      </nav>
+      </aside>
+
       <main key={route.path} className="route-enter">
         <Page />
       </main>
+
+      <nav className="tabbar">{ROUTES.filter((r) => r.group === 'main').map(link)}</nav>
     </div>
   );
 }

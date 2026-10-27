@@ -5,12 +5,21 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
 
 ## Qué incluye el MVP
 
-- **Jugar contra bots**: 9 ritmos (1 min a 30 min y sin reloj), Elo propio por ritmo (bullet, blitz, rápidas),
+- **Jugar contra bots**: ritmos agrupados por modo (bullet, blitz, rápidas y sin reloj), Elo propio por modo,
   bot adaptativo a tu Elo o Elo elegido (400–3000). Por encima de 1320 usa `UCI_Elo` de Stockfish; por debajo,
   elige entre varias jugadas candidatas con más "ruido" cuanto más bajo es el Elo. Sin reloj se puede deshacer.
+- **Estilos de bot** (`src/lib/style.ts`): equilibrado, conservador, agresivo, kamikaze o personalizado con tres
+  parámetros (agresividad, cambios de piezas y riesgo). El bot elige entre las mejores jugadas del motor dando
+  puntos extra a las que encajan con su estilo.
+- **Precisión en directo**: un segundo motor valora cada jugada tuya mientras juegas.
 - **Análisis de partidas**: tus partidas de chess.com (API pública, sin login), las jugadas contra los bots o un PGN pegado.
   Barra y gráfica de evaluación, precisión por jugador y clasificación de cada jugada
   (brillante, gran jugada, mejor, excelente, buena, imprecisión, error, error grave) con la mejor alternativa.
+  La nota combina la probabilidad de ganar perdida (como Lichess) con los centipeones perdidos, así que también
+  castiga los errores en posiciones ya decididas. Además mide la **presión**: el porcentaje de jugadas que dejan
+  al rival con una sola respuesta buena.
+- **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
+  precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
 - **Puzzles**: clasificados (Elo de puzzles) y contrarreloj de 3 minutos. Generados con Stockfish a partir de errores
   en partidas (`scripts/gen-puzzles.mjs`).
 - **Coordenadas**: 30 segundos para encontrar casillas, desde blancas o negras.
