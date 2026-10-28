@@ -105,7 +105,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval)
   // En posiciones muy decididas un mismo error en centipeones importa algo menos.
   const level = Math.abs(clampCp(sign * evalToCp(before)));
   const weight = level <= 300 ? 1 : 1 - ((level - 300) / 700) * (1 - DECIDED_MIN_WEIGHT);
-  const loss = Math.max(winLoss, (cpLoss / CP_DIVISOR) * weight);
+  // Si tras la jugada sigues aplastando (+6 o más), solo cuenta la probabilidad de ganar:
+  // así no se castiga elegir un camino más largo hacia una victoria que sigue siendo clara.
+  const crushing = sign * evalToCp(after) >= 600;
+  const loss = crushing ? winLoss : Math.max(winLoss, (cpLoss / CP_DIVISOR) * weight);
   const accuracy = Math.max(0, Math.min(100, 103.1668 * Math.exp(-ACCURACY_DECAY * loss) - 3.1669));
   const uci = move.from + move.to + (move.promotion ?? '');
   let cls: Classification;
