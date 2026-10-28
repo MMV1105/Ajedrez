@@ -1,6 +1,7 @@
 import { getRating } from '../lib/elo';
 import { load } from '../lib/storage';
 import LESSONS from '../data/lessons.json';
+import OPENING_LESSONS from '../data/opening-lessons.json';
 import { PHASE_INFO, trainerProgress, type TrainerPhase } from '../lib/trainer';
 
 export default function Train() {
@@ -15,7 +16,7 @@ export default function Train() {
     { path: 'puzzles', title: 'Puzzles', text: 'Tácticas sacadas de errores reales. Clasificados o contrarreloj.', stat: `Elo ${getRating('puzzles').rating} · récord ${load('rushBest', 0)}` },
     { path: 'coordenadas', title: 'Coordenadas', text: 'Encuentra casillas lo más rápido posible durante 30 segundos.', stat: `Récord ${Math.max(coord.white ?? 0, coord.black ?? 0)}` },
     { path: 'memoria', title: 'Memoria', text: 'Memoriza una posición y reconstrúyela pieza a pieza.', stat: `Mejor nivel ${load('memoryBest', 0)}` },
-    { path: 'lecciones', title: 'Lecciones', text: 'Tácticas básicas, mates y finales, con ejercicios.', stat: `${done} de ${LESSONS.length} hechas` },
+    { path: 'lecciones', title: 'Lecciones', text: 'Tácticas, mates, finales y la teoría de cada apertura y defensa.', stat: `${done} de ${LESSONS.length + OPENING_LESSONS.length} hechas` },
   ];
   return (
     <div className="page narrow">

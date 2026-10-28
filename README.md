@@ -34,7 +34,10 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   en partidas (`scripts/gen-puzzles.mjs`).
 - **Coordenadas**: 30 segundos para encontrar casillas, desde blancas o negras.
 - **Memoria**: memoriza una posición y reconstrúyela; cada nivel añade una pieza.
-- **Lecciones**: horquilla, clavada, mate del pasillo, mate del pastor, mates de dama y torre y oposición
+- **Lecciones**: horquilla, clavada, mate del pasillo, mate del pastor, mates de dama y torre y oposición.
+  También hay 12 lecciones de aperturas (con blancas) y 14 de defensas (con negras), ordenadas de más a menos jugadas.
+  Cada una tiene una línea por cada respuesta habitual del rival. Juegas tú la teoría y se explica cada jugada.
+  Las líneas salen del libro de aperturas y se comprueban con Stockfish (`node scripts/build-opening-lessons.mjs src/data/opening-lessons.json`)
   (los ejercicios se verifican con Stockfish en `scripts/build-lessons.mjs`; las prácticas son contra el motor).
 - Importar tu Elo de chess.com como punto de partida, sonidos sintetizados y animaciones.
 
