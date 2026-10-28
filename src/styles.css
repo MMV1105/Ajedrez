@@ -1729,3 +1729,112 @@ td.strong {
 .page-tabs .segmented button {
   white-space: nowrap;
 }
+
+/* ---------- Aperturas guiadas ---------- */
+.guide-box,
+.guide-threat,
+.guide-tree {
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+.guide-box p,
+.guide-threat p {
+  margin: 0.35rem 0 0;
+}
+.guide-threat {
+  border-left: 3px solid var(--bad);
+}
+.guide-best {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.guide-tag {
+  font-size: 0.75rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+.guide-alts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.guide-feedback {
+  margin-top: 0.8rem;
+  padding: 0.55rem 0.8rem;
+  background: var(--bg);
+  border-left: 3px solid var(--good);
+  font-weight: 600;
+}
+.guide-feedback.ok {
+  border-left-color: var(--accent);
+}
+.guide-feedback.bad {
+  border-left-color: var(--bad);
+}
+.guide-tree ul {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+}
+.guide-tree li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.92rem;
+}
+.guide-tree li + li {
+  border-top: 1px solid var(--line);
+}
+.guide-tree li.chosen {
+  background: var(--surface-2);
+}
+.guide-answer {
+  color: var(--muted);
+}
+.guide-answer strong {
+  color: var(--text);
+}
+.guide-chosen {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.data-table.top3 {
+  margin-top: 0.7rem;
+}
+.data-table.top3 tbody tr {
+  cursor: pointer;
+}
+.data-table.top3 tbody tr:hover {
+  background: var(--surface-2);
+}
+.data-table td.good {
+  color: var(--good);
+}
+.data-table td.bad {
+  color: var(--bad);
+}
+.top3-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+}
+.nowrap {
+  white-space: nowrap;
+}

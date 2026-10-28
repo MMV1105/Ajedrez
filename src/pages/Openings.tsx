@@ -9,13 +9,14 @@ import { playMoveSound } from '../lib/sound';
 import { load, save } from '../lib/storage';
 import { formatCp } from '../lib/trainer';
 import { OpeningsTrainer } from './Trainer';
+import OpeningGuide from './OpeningGuide';
 
 const DEPTH = 12;
 // Jugadas tuyas fuera de teoría antes de cerrar la sesión con el resumen.
 const MOVES_AFTER_BOOK = 10;
 const BOOK_COLOR = '#d6a24a';
 
-type Mode = 'inicio' | 'posiciones';
+type Mode = 'guiado' | 'inicio' | 'posiciones';
 type Status = 'setup' | 'playing' | 'thinking' | 'over';
 type Judged = { cls: Classification; accuracy: number };
 type Setup = { color: 'w' | 'b' | 'random'; line: number; showEval: boolean };
@@ -27,21 +28,24 @@ const clamp = (v: number) => Math.max(-2000, Math.min(2000, v));
 const moveNumber = (ply: number) => `${Math.floor(ply / 2) + 1}${ply % 2 ? '…' : '.'}`;
 
 export default function Openings() {
-  const [mode, setMode] = useState<Mode>(() => load('openingsMode', 'inicio'));
-  useEffect(() => save('openingsMode', mode), [mode]);
+  const [mode, setMode] = useState<Mode>(() => load('openingsTab', 'guiado'));
+  useEffect(() => save('openingsTab', mode), [mode]);
   return (
     <>
       <div className="page-tabs">
         <div className="segmented">
+          <button className={mode === 'guiado' ? 'on' : ''} onClick={() => setMode('guiado')}>
+            Guiado
+          </button>
           <button className={mode === 'inicio' ? 'on' : ''} onClick={() => setMode('inicio')}>
-            Desde el inicio
+            Práctica libre
           </button>
           <button className={mode === 'posiciones' ? 'on' : ''} onClick={() => setMode('posiciones')}>
             Posiciones
           </button>
         </div>
       </div>
-      {mode === 'inicio' ? <OpeningPractice /> : <OpeningsTrainer />}
+      {mode === 'guiado' ? <OpeningGuide /> : mode === 'inicio' ? <OpeningPractice /> : <OpeningsTrainer />}
     </>
   );
 }

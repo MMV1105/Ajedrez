@@ -66,8 +66,12 @@ export async function evalPosition(engine: Engine, fen: string, depth: number): 
   const whiteToMove = chess.turn() === 'w';
   if (chess.isCheckmate()) return { cp: whiteToMove ? -10000 : 10000, mate: 0, best: null, second: null, pv: [], goodMoves: 0 };
   if (chess.isDraw() || chess.isStalemate()) return { cp: 0, mate: null, best: null, second: null, pv: [], goodMoves: 0 };
-  const lines: Line[] = await engine.analyse(fen, { depth, multipv: 3 });
-  const sign = whiteToMove ? 1 : -1;
+  return linesToEval(fen, await engine.analyse(fen, { depth, multipv: 3 }));
+}
+
+// Evaluación de una posición (no terminada) a partir de las líneas del motor, desde el punto de vista de las blancas.
+export function linesToEval(fen: string, lines: Line[]): PositionEval {
+  const sign = new Chess(fen).turn() === 'w' ? 1 : -1;
   const [a, b] = lines;
   const top = scoreOf(a);
   return {
