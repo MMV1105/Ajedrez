@@ -18,6 +18,8 @@ const CLASSES = [
 ] as const;
 
 const DEPTH = 12;
+// Sube la versión cuando cambie la forma de puntuar, para no mezclar notas viejas y nuevas.
+const SUMMARIES_KEY = 'summaries2';
 
 export default function Profile() {
   const [source, setSource] = useState<'chesscom' | 'local'>('chesscom');
@@ -89,7 +91,7 @@ export default function Profile() {
       const pending = await collect();
       if (!pending.length) throw new Error('No hay partidas que analizar con esos filtros.');
       engineRef.current ??= new Engine();
-      const cache = load<Record<string, GameSummary>>('summaries', {});
+      const cache = load<Record<string, GameSummary>>(SUMMARIES_KEY, {});
       const summaries: GameSummary[] = [];
       for (let i = 0; i < pending.length; i++) {
         if (id !== runId.current) return;
@@ -107,7 +109,7 @@ export default function Profile() {
           if (a.moves.length < 10) continue; // partidas demasiado cortas no dicen nada
           s = summarizeGame(a, p.pgn, { id: p.id, date: p.date, color: p.color, result: p.result, timeClass: p.timeClass });
           cache[p.id] = s;
-          save('summaries', trimCache(cache));
+          save(SUMMARIES_KEY, trimCache(cache));
         }
         summaries.push(s);
       }
