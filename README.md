@@ -20,6 +20,10 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
+- **Aperturas desde el inicio**: juegas desde la primera jugada; el rival responde con teoría variada (o sigue la
+  apertura que elijas) y cada jugada se marca como teoría o con su nota. Se puede deshacer, ver las jugadas de teoría y
+  consultar el historial de sesiones. El libro sale de [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings)
+  (dominio público) con `scripts/build-openings.mjs`.
 - **Entrenadores de aperturas, medio juego y finales**: aparece una posición (igualada, con un error del rival o
   difícil de defender) y la juegas contra Stockfish. Hay que aguantar unas jugadas sin que la evaluación baje de un
   límite. Las posiciones salen de `scripts/gen-trainer.mjs`, que incluye finales clásicos como Lucena o Philidor.

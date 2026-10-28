@@ -1684,3 +1684,48 @@ td.strong {
   align-items: center;
   gap: 0.3rem;
 }
+
+/* ---------- Aperturas desde el inicio ---------- */
+.page-tabs {
+  display: flex;
+  justify-content: center;
+  padding: 0.2rem 0 0.6rem;
+}
+.opening-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0.2rem 0 0.1rem;
+}
+.theory-box {
+  margin-top: 0.8rem;
+}
+.theory-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.opening-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  margin: 0.9rem 0;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  max-height: 9.5rem;
+  overflow-y: auto;
+}
+.opening-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.opening-move.book {
+  color: var(--accent);
+}
+.opening-move .mv-num {
+  color: var(--muted);
+}
+.page-tabs .segmented button {
+  white-space: nowrap;
+}

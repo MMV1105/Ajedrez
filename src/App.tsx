@@ -8,7 +8,8 @@ import Puzzles from './pages/Puzzles';
 import Coordinates from './pages/Coordinates';
 import Memory from './pages/Memory';
 import Lessons from './pages/Lessons';
-import { EndgameTrainer, MiddlegameTrainer, OpeningsTrainer } from './pages/Trainer';
+import { EndgameTrainer, MiddlegameTrainer } from './pages/Trainer';
+import Openings from './pages/Openings';
 import Icon from './components/Icon';
 import { isMuted, setMuted } from './lib/sound';
 
@@ -20,7 +21,7 @@ const ROUTES: Route[] = [
   { path: 'analizar', label: 'Analizar', icon: 'analyze', page: Analysis, group: 'main' },
   { path: 'perfil', label: 'Perfil', icon: 'profile', page: Profile, group: 'main' },
   { path: 'entrenar', label: 'Entrenar', icon: 'puzzle', page: Train, group: 'main' },
-  { path: 'aperturas', label: 'Aperturas', icon: 'book', page: OpeningsTrainer, group: 'train' },
+  { path: 'aperturas', label: 'Aperturas', icon: 'book', page: Openings, group: 'train' },
   { path: 'medio-juego', label: 'Medio juego', icon: 'bolt', page: MiddlegameTrainer, group: 'train' },
   { path: 'finales', label: 'Finales', icon: 'flag', page: EndgameTrainer, group: 'train' },
   { path: 'puzzles', label: 'Puzzles', icon: 'puzzle', page: Puzzles, group: 'train' },
