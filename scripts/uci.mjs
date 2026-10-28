@@ -7,8 +7,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ENGINE = path.join(here, '../node_modules/stockfish/bin/stockfish-19-lite-single.js');
 
 export class Engine {
+  // Con STOCKFISH_PATH se usa un Stockfish nativo en vez del lite de npm.
   constructor() {
-    this.proc = spawn('node', [ENGINE], { stdio: ['pipe', 'pipe', 'inherit'] });
+    const native = process.env.STOCKFISH_PATH;
+    this.proc = native ? spawn(native, [], { stdio: ['pipe', 'pipe', 'inherit'] }) : spawn('node', [ENGINE], { stdio: ['pipe', 'pipe', 'inherit'] });
     this.buf = '';
     this.listeners = [];
     this.proc.stdout.on('data', (d) => {

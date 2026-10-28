@@ -43,6 +43,8 @@ export default function Analysis() {
   const engineRef = useRef<Engine | null>(null);
   const runId = useRef(0);
   const [remote, setRemote] = useState(false);
+  // Precisión que da chess.com a la partida, para comparar.
+  const [chesscomAcc, setChesscomAcc] = useState<{ w: number; b: number } | null>(null);
 
   useEffect(() => {
     const engine = (engineRef.current = new Engine());
@@ -86,8 +88,9 @@ export default function Analysis() {
     }
   }
 
-  async function startAnalysis(p: string, d = depth) {
+  async function startAnalysis(p: string, d = depth, ref: ChessComGame['accuracies'] = undefined) {
     const id = ++runId.current;
+    setChesscomAcc(ref ? { w: ref.white, b: ref.black } : null);
     try {
       new Chess().loadPgn(p);
     } catch {
@@ -233,6 +236,7 @@ export default function Analysis() {
                         <AnimatedNumber from={0} to={analysis.accuracy[c]} decimals={1} />
                       </span>
                       <span className="small">precisión</span>
+                      {chesscomAcc && <span className="small muted">chess.com {chesscomAcc[c].toFixed(1)}</span>}
                       <span className="small pressure-line" title="Jugadas que dejan al rival con una sola respuesta buena">
                         presión {analysis.pressure[c].toFixed(0)} %
                       </span>
@@ -373,7 +377,7 @@ export default function Analysis() {
               const opp = meWhite ? g.black : g.white;
               const me = meWhite ? g.white : g.black;
               return (
-                <button key={g.url} className="game-item" style={{ animationDelay: `${Math.min(i, 15) * 30}ms` }} onClick={() => startAnalysis(g.pgn)}>
+                <button key={g.url} className="game-item" style={{ animationDelay: `${Math.min(i, 15) * 30}ms` }} onClick={() => startAnalysis(g.pgn, depth, g.accuracies)}>
                   <span className={`result-pill ${r}`}>{r === 'win' ? 'V' : r === 'loss' ? 'D' : 'T'}</span>
                   <span className="game-main">
                     <strong>
@@ -381,6 +385,7 @@ export default function Analysis() {
                     </strong>
                     <span className="muted small">
                       {g.time_class} · {new Date(g.end_time * 1000).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} · tu Elo {me.rating}
+                      {g.accuracies && ` · chess.com ${(meWhite ? g.accuracies.white : g.accuracies.black).toFixed(1)}`}
                     </span>
                   </span>
                   <span className="go">Analizar →</span>
