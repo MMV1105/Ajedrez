@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import { evalToCp, winPct, type Classification, type GameAnalysis } from './analysis';
+import { evalToCp, isMistake, winPct, type Classification, type GameAnalysis } from './analysis';
 import type { BotStyle } from './style';
 
 type Phase = 'apertura' | 'medio juego' | 'final';
@@ -81,7 +81,7 @@ export function summarizeGame(
   const clk = clocks(pgn);
   let timeTroubleErrors = 0;
   for (const m of mine) {
-    if (m.cls !== 'error' && m.cls !== 'grave') continue;
+    if (!isMistake(m.cls)) continue;
     const left = clk.get(m.fenAfter);
     if (base && left !== undefined && left < Math.max(15, base * 0.1)) timeTroubleErrors++;
   }

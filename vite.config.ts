@@ -5,4 +5,6 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   plugins: [react()],
+  // En desarrollo, /engine va al servidor de server/index.mjs si está arrancado (si no, se usa el lite).
+  server: { proxy: { '/engine': { target: 'ws://127.0.0.1:8080', ws: true } } },
 });

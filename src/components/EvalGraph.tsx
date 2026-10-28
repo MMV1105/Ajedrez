@@ -23,7 +23,7 @@ export default function EvalGraph({ analysis, ply, onSelect }: { analysis: GameA
       <path d={d} fill="#e9edf2" className="eval-area" />
       <line x1={0} x2={W} y1={H / 2} y2={H / 2} stroke="#8892a0" strokeDasharray="4 4" strokeWidth={1} />
       {analysis.moves.map((m, i) =>
-        ['grave', 'error', 'brillante', 'gran'].includes(m.cls) ? (
+        ['grave', 'error', 'fallo', 'brillante', 'gran'].includes(m.cls) ? (
           <circle key={i} cx={x(i + 1)} cy={y(i + 1)} r={4.5} fill={CLASS_INFO[m.cls].color} stroke="#111" strokeWidth={1} />
         ) : null,
       )}

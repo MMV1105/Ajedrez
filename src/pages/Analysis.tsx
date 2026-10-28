@@ -7,6 +7,7 @@ import MoveList from '../components/MoveList';
 import AnimatedNumber from '../components/AnimatedNumber';
 import Icon from '../components/Icon';
 import { Engine } from '../lib/engine';
+import { loadBook } from '../lib/openings';
 import { analyzeGame, CLASS_INFO, formatEval, type Classification, type GameAnalysis } from '../lib/analysis';
 import { fetchArchives, fetchMonth, monthLabel, resultFor, type ChessComGame } from '../lib/chesscom';
 import { takePendingPgn } from '../lib/nav';
@@ -16,7 +17,7 @@ import type { SavedGame } from './Play';
 
 type Source = 'chesscom' | 'bots' | 'pgn';
 
-const SUMMARY_ORDER: Classification[] = ['brillante', 'gran', 'mejor', 'excelente', 'buena', 'imprecision', 'error', 'grave'];
+const SUMMARY_ORDER: Classification[] = ['brillante', 'gran', 'mejor', 'excelente', 'buena', 'teoria', 'imprecision', 'error', 'fallo', 'grave'];
 
 function header(pgn: string, key: string) {
   return new RegExp(`\\[${key} "([^"]*)"\\]`).exec(pgn)?.[1] ?? '';
@@ -41,9 +42,11 @@ export default function Analysis() {
 
   const engineRef = useRef<Engine | null>(null);
   const runId = useRef(0);
+  const [remote, setRemote] = useState(false);
 
   useEffect(() => {
-    engineRef.current = new Engine();
+    const engine = (engineRef.current = new Engine());
+    engine.ready.then(() => setRemote(engine.remote));
     const pending = takePendingPgn();
     if (pending) startAnalysis(pending);
     return () => {
@@ -98,7 +101,8 @@ export default function Analysis() {
     const me = username.trim().toLowerCase();
     setFlip(header(p, 'Black').toLowerCase() === me || header(p, 'Black') === 'Tú');
     setProgress([0, 1]);
-    const res = await analyzeGame(engineRef.current!, p, d, (a, b) => id === runId.current && setProgress([a, b]), () => id !== runId.current);
+    const book = await loadBook();
+    const res = await analyzeGame(engineRef.current!, p, d, (a, b) => id === runId.current && setProgress([a, b]), () => id !== runId.current, book);
     if (id !== runId.current || !res) return;
     setProgress(null);
     setAnalysis(res);
@@ -211,7 +215,7 @@ export default function Analysis() {
             {progress && (
               <div className="progress-box">
                 <p>
-                  Analizando con Stockfish 19… {progress[0]}/{progress[1]} posiciones
+                  Analizando con Stockfish 19 {remote ? 'completo (servidor)' : 'lite'}… {progress[0]}/{progress[1]} posiciones
                 </p>
                 <div className="progress">
                   <div style={{ width: `${(progress[0] / progress[1]) * 100}%` }} />
@@ -287,7 +291,7 @@ export default function Analysis() {
                   onSelect={(i) => go(i + 1)}
                   decorate={(i) => {
                     const c = analysis.moves[i].cls;
-                    return ['brillante', 'gran', 'imprecision', 'error', 'grave'].includes(c) ? (
+                    return ['brillante', 'gran', 'imprecision', 'error', 'fallo', 'grave'].includes(c) ? (
                       <span className="cls-dot tiny" style={{ background: CLASS_INFO[c].color }}>
                         {CLASS_INFO[c].icon}
                       </span>
@@ -326,6 +330,7 @@ export default function Analysis() {
               [12, 'Rápido'],
               [14, 'Normal'],
               [18, 'Profundo'],
+              ...(remote ? [[22, 'Máximo']] : []),
             ].map(([d, l]) => (
               <button
                 key={d}

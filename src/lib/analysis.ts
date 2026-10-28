@@ -1,7 +1,8 @@
 import { Chess, type Move } from 'chess.js';
 import { Engine, scoreOf, type Line } from './engine';
+import { bookMoves, type Book } from './openings';
 
-export type Classification = 'brillante' | 'gran' | 'mejor' | 'excelente' | 'buena' | 'imprecision' | 'error' | 'grave';
+export type Classification = 'brillante' | 'gran' | 'mejor' | 'excelente' | 'buena' | 'teoria' | 'imprecision' | 'error' | 'fallo' | 'grave';
 
 export const CLASS_INFO: Record<Classification, { label: string; color: string; icon: string }> = {
   brillante: { label: 'Brillante', color: '#26c2a3', icon: '!!' },
@@ -9,8 +10,10 @@ export const CLASS_INFO: Record<Classification, { label: string; color: string; 
   mejor: { label: 'Mejor', color: '#81b64c', icon: '★' },
   excelente: { label: 'Excelente', color: '#96bc4b', icon: '+' },
   buena: { label: 'Buena', color: '#97af8b', icon: '✓' },
+  teoria: { label: 'Teoría', color: '#a88865', icon: '≡' },
   imprecision: { label: 'Imprecisión', color: '#f7c631', icon: '?!' },
   error: { label: 'Error', color: '#ffa459', icon: '?' },
+  fallo: { label: 'Ocasión fallada', color: '#ff7769', icon: '✕' },
   grave: { label: 'Error grave', color: '#fa412d', icon: '??' },
 };
 
@@ -23,8 +26,9 @@ export type AnalyzedMove = {
   color: 'w' | 'b';
   evalBefore: PositionEval; // desde blancas
   evalAfter: PositionEval; // desde blancas
-  winBefore: number; // % de victoria del que mueve
-  winAfter: number;
+  epBefore: number; // puntos esperados del que mueve (0 a 1)
+  epAfter: number;
+  epLoss: number;
   accuracy: number;
   cpLoss: number;
   cls: Classification;
@@ -86,68 +90,76 @@ export function linesToEval(fen: string, lines: Line[]): PositionEval {
 
 const clampCp = (v: number) => Math.max(-1000, Math.min(1000, v));
 
-// Exigencia del análisis. Subir CP_DIVISOR o ACCURACY_DECAY lo hace más blando; bajarlos, más duro.
-// Cada centipeón perdido cuenta 1/CP_DIVISOR puntos de pérdida (8 → perder 80 cp son 10 puntos).
-const CP_DIVISOR = 8;
-// En posiciones decididas (más de +3) la pérdida en centipeones pesa menos, hasta este mínimo a +10.
-const DECIDED_MIN_WEIGHT = 0.6;
-// Pendiente de la curva de precisión (Lichess usa 0.04354): pérdida 5 → 71, pérdida 10 → 51.
-const ACCURACY_DECAY = 0.065;
-// Pérdida máxima (en puntos) para cada nota; por encima de la última, error grave.
-const LIMITS = { mejor: 0.3, excelente: 1.5, buena: 3, imprecision: 7, error: 14 };
+// Valoración al estilo de chess.com: cada evaluación se pasa a puntos esperados (EP, de 0 a 1)
+// y la nota de la jugada sale de cuántos puntos esperados pierde frente a la mejor.
+export function expectedPoints(cp: number) {
+  return 1 / (1 + Math.pow(10, -cp / 400));
+}
 
-// Nota de una jugada a partir de la evaluación antes y después.
-// Es más exigente que la de Lichess: además de la probabilidad de ganar, cuenta los
-// centipeones perdidos, para que los errores en posiciones ya decididas también resten.
-export function judgeMove(move: Move, before: PositionEval, after: PositionEval) {
+// Pérdida máxima de puntos esperados para cada nota; por encima de la última, error grave.
+const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
+// Pendiente de la precisión por jugada: 100·e^(−k·ΔEP). Con 3.2: perder 0.05 → 85, 0.1 → 73, 0.2 → 53.
+const ACCURACY_K = 3.2;
+
+export type MoveContext = {
+  inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
+  prevLoss?: number; // puntos esperados que acaba de perder el rival con su jugada anterior
+};
+
+export function judgeMove(move: Move, before: PositionEval, after: PositionEval, ctx: MoveContext = {}) {
   const color = move.color;
   const sign = color === 'w' ? 1 : -1;
-  const winBefore = winPct(sign * evalToCp(before));
-  const winAfter = winPct(sign * evalToCp(after));
-  const winLoss = Math.max(0, winBefore - winAfter);
-  const cpLoss = Math.max(0, clampCp(sign * evalToCp(before)) - clampCp(sign * evalToCp(after)));
-  // En posiciones muy decididas un mismo error en centipeones importa algo menos.
-  const level = Math.abs(clampCp(sign * evalToCp(before)));
-  const weight = level <= 300 ? 1 : 1 - ((level - 300) / 700) * (1 - DECIDED_MIN_WEIGHT);
-  // Si tras la jugada sigues aplastando (+6 o más), solo cuenta la probabilidad de ganar:
-  // así no se castiga elegir un camino más largo hacia una victoria que sigue siendo clara.
-  const crushing = sign * evalToCp(after) >= 600;
-  const loss = crushing ? winLoss : Math.max(winLoss, (cpLoss / CP_DIVISOR) * weight);
-  const accuracy = Math.max(0, Math.min(100, 103.1668 * Math.exp(-ACCURACY_DECAY * loss) - 3.1669));
+  const cpBefore = sign * evalToCp(before);
+  const cpAfter = sign * evalToCp(after);
+  const epBefore = expectedPoints(cpBefore);
+  const epAfter = expectedPoints(cpAfter);
+  const epLoss = Math.max(0, epBefore - epAfter);
+  const cpLoss = Math.max(0, clampCp(cpBefore) - clampCp(cpAfter));
+  const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
   const uci = move.from + move.to + (move.promotion ?? '');
-  let cls: Classification;
-  if (uci === before.best || (loss < LIMITS.mejor && cpLoss <= 3)) {
-    cls = 'mejor';
-    // ¿Única buena jugada? La segunda opción perdía mucho.
-    const secondWin = before.second === null ? null : winPct(sign * before.second);
-    if (secondWin !== null && winBefore - secondWin > 12 && winBefore < 92 && winAfter > 40) cls = 'gran';
-    // Sacrificio que funciona: tras la mejor respuesta queda con menos material y sigue bien.
-    if (move.piece !== 'p' && after.best && winAfter > 50 && winBefore < 97) {
+  const best = uci === before.best || (epLoss < 0.001 && cpLoss <= 5);
+
+  // Brillante: casi la mejor, entrega al menos 2 puntos de material (tras la mejor respuesta del rival)
+  // y no deja peor al que la juega. No cuenta si ya estaba todo ganado.
+  const sacrifice = () => {
+    if (move.piece === 'p' || !after.best) return false;
+    try {
       const reply = new Chess(move.after);
-      try {
-        reply.move({ from: after.best.slice(0, 2), to: after.best.slice(2, 4), promotion: after.best[4] });
-        if (materialFor(reply.fen(), color) - materialFor(move.before, color) <= -2) cls = 'brillante';
-      } catch {
-        /* jugada del motor no aplicable */
-      }
+      reply.move({ from: after.best.slice(0, 2), to: after.best.slice(2, 4), promotion: after.best[4] });
+      return materialFor(reply.fen(), color) - materialFor(move.before, color) <= -2;
+    } catch {
+      return false; // jugada del motor no aplicable
     }
-  } else if (loss < LIMITS.excelente) cls = 'excelente';
-  else if (loss < LIMITS.buena) cls = 'buena';
-  else if (loss < LIMITS.imprecision) cls = 'imprecision';
-  else if (loss < LIMITS.error) cls = 'error';
-  else cls = 'grave';
+  };
+
+  let cls: Classification;
+  if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
+  else if (epLoss <= LIMITS.excelente && epAfter >= 0.5 && epBefore < 0.97 && sacrifice()) cls = 'brillante';
+  else if (best) {
+    // Gran jugada: la única buena. La segunda opción perdía al menos 0.15 y esta salva o mantiene la partida.
+    const second = before.second === null ? null : expectedPoints(sign * before.second);
+    cls = second !== null && epBefore - second >= 0.15 && epAfter >= 0.4 ? 'gran' : 'mejor';
+  } else if (epLoss <= LIMITS.excelente) cls = 'excelente';
+  else if (epLoss <= LIMITS.buena) cls = 'buena';
+  else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
+  else {
+    // Ocasión fallada: el rival acababa de equivocarse y devuelves lo ganado, sin quedar peor que antes de su error.
+    const prev = ctx.prevLoss ?? 0;
+    const missed = prev > LIMITS.imprecision && epAfter >= epBefore - prev - 0.05;
+    cls = missed ? 'fallo' : epLoss <= LIMITS.error ? 'error' : 'grave';
+  }
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
   const pressure = !decided && after.goodMoves === 1 && new Chess(move.after).moves().length > 1;
-  return { winBefore, winAfter, cpLoss, accuracy, cls, pressure };
+  return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
 }
 
+// Precisión de la partida: media de la precisión de cada jugada.
 export function playerAccuracy(xs: number[]) {
-  if (!xs.length) return 0;
-  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
-  const harmonic = xs.length / xs.reduce((a, b) => a + 1 / Math.max(b, 1), 0);
-  return (mean + harmonic) / 2;
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 }
+
+export const isMistake = (c: Classification) => c === 'error' || c === 'fallo' || c === 'grave';
 
 export async function analyzeGame(
   engine: Engine,
@@ -155,6 +167,7 @@ export async function analyzeGame(
   depth: number,
   onProgress: (done: number, total: number) => void,
   isCancelled: () => boolean,
+  book: Book | null = null,
 ): Promise<GameAnalysis | null> {
   const chess = new Chess();
   chess.loadPgn(pgn);
@@ -167,15 +180,15 @@ export async function analyzeGame(
     evals.push(await evalPosition(engine, fens[i], depth));
     onProgress(i + 1, fens.length);
   }
-  const moves: AnalyzedMove[] = history.map((move, i) => ({
-    move,
-    fenBefore: move.before,
-    fenAfter: move.after,
-    color: move.color,
-    evalBefore: evals[i],
-    evalAfter: evals[i + 1],
-    ...judgeMove(move, evals[i], evals[i + 1]),
-  }));
+  const moves: AnalyzedMove[] = [];
+  let inTheory = !!book && history.length > 0 && history[0].before === new Chess().fen();
+  history.forEach((move, i) => {
+    const uci = move.from + move.to + (move.promotion ?? '');
+    // La teoría solo cuenta mientras la partida no ha salido del libro.
+    inTheory = inTheory && bookMoves(book!, move.before).some((m) => m.uci === uci);
+    const judged = judgeMove(move, evals[i], evals[i + 1], { inBook: inTheory, prevLoss: moves[i - 1]?.epLoss });
+    moves.push({ move, fenBefore: move.before, fenAfter: move.after, color: move.color, evalBefore: evals[i], evalAfter: evals[i + 1], ...judged });
+  });
   const stats = (c: 'w' | 'b') => {
     const mine = moves.filter((m) => m.color === c);
     return {

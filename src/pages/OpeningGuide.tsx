@@ -3,7 +3,7 @@ import { Chess } from 'chess.js';
 import Board, { type MoveInput } from '../components/Board';
 import EvalBar from '../components/EvalBar';
 import { Engine } from '../lib/engine';
-import { CLASS_INFO, evalToCp, judgeMove, playerAccuracy, type Classification, type PositionEval } from '../lib/analysis';
+import { CLASS_INFO, evalToCp, isMistake, judgeMove, playerAccuracy, type Classification, type PositionEval } from '../lib/analysis';
 import { guideFor, repliesFor, type Guide, type Reply } from '../lib/guide';
 import { bookMoves, bookName, loadBook, loadSessions, pickBookMove, saveSession, type Book } from '../lib/openings';
 import { playMoveSound } from '../lib/sound';
@@ -86,7 +86,7 @@ export default function OpeningGuide() {
         color: c,
         bookPlies,
         accuracy: list.length ? playerAccuracy(list.map((p) => p.accuracy)) : null,
-        errors: list.filter((p) => p.cls === 'error' || p.cls === 'grave').length,
+        errors: list.filter((p) => isMistake(p.cls)).length,
         finalEval: lastEval ? Math.max(-2000, Math.min(2000, (c === 'w' ? 1 : -1) * evalToCp(lastEval))) : 0,
       });
       setSessions(loadSessions());
