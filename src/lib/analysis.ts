@@ -82,6 +82,16 @@ export async function evalPosition(engine: Engine, fen: string, depth: number): 
 
 const clampCp = (v: number) => Math.max(-1000, Math.min(1000, v));
 
+// Exigencia del análisis. Subir CP_DIVISOR o ACCURACY_DECAY lo hace más blando; bajarlos, más duro.
+// Cada centipeón perdido cuenta 1/CP_DIVISOR puntos de pérdida (8 → perder 80 cp son 10 puntos).
+const CP_DIVISOR = 8;
+// En posiciones decididas (más de +3) la pérdida en centipeones pesa menos, hasta este mínimo a +10.
+const DECIDED_MIN_WEIGHT = 0.6;
+// Pendiente de la curva de precisión (Lichess usa 0.04354): pérdida 5 → 71, pérdida 10 → 51.
+const ACCURACY_DECAY = 0.065;
+// Pérdida máxima (en puntos) para cada nota; por encima de la última, error grave.
+const LIMITS = { mejor: 0.3, excelente: 1.5, buena: 3, imprecision: 7, error: 14 };
+
 // Nota de una jugada a partir de la evaluación antes y después.
 // Es más exigente que la de Lichess: además de la probabilidad de ganar, cuenta los
 // centipeones perdidos, para que los errores en posiciones ya decididas también resten.
@@ -94,12 +104,12 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval)
   const cpLoss = Math.max(0, clampCp(sign * evalToCp(before)) - clampCp(sign * evalToCp(after)));
   // En posiciones muy decididas un mismo error en centipeones importa algo menos.
   const level = Math.abs(clampCp(sign * evalToCp(before)));
-  const weight = level <= 300 ? 1 : 1 - ((level - 300) / 700) * 0.65;
-  const loss = Math.max(winLoss, (cpLoss / 12) * weight);
-  const accuracy = Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
+  const weight = level <= 300 ? 1 : 1 - ((level - 300) / 700) * (1 - DECIDED_MIN_WEIGHT);
+  const loss = Math.max(winLoss, (cpLoss / CP_DIVISOR) * weight);
+  const accuracy = Math.max(0, Math.min(100, 103.1668 * Math.exp(-ACCURACY_DECAY * loss) - 3.1669));
   const uci = move.from + move.to + (move.promotion ?? '');
   let cls: Classification;
-  if (uci === before.best || (loss < 0.5 && cpLoss <= 5)) {
+  if (uci === before.best || (loss < LIMITS.mejor && cpLoss <= 3)) {
     cls = 'mejor';
     // ¿Única buena jugada? La segunda opción perdía mucho.
     const secondWin = before.second === null ? null : winPct(sign * before.second);
@@ -114,10 +124,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval)
         /* jugada del motor no aplicable */
       }
     }
-  } else if (loss < 2) cls = 'excelente';
-  else if (loss < 5) cls = 'buena';
-  else if (loss < 10) cls = 'imprecision';
-  else if (loss < 20) cls = 'error';
+  } else if (loss < LIMITS.excelente) cls = 'excelente';
+  else if (loss < LIMITS.buena) cls = 'buena';
+  else if (loss < LIMITS.imprecision) cls = 'imprecision';
+  else if (loss < LIMITS.error) cls = 'error';
   else cls = 'grave';
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
