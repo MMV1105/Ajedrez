@@ -20,6 +20,9 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
+- **Entrenadores de aperturas, medio juego y finales**: aparece una posición (igualada, con un error del rival o
+  difícil de defender) y la juegas contra Stockfish. Hay que aguantar unas jugadas sin que la evaluación baje de un
+  límite. Las posiciones salen de `scripts/gen-trainer.mjs`, que incluye finales clásicos como Lucena o Philidor.
 - **Puzzles**: clasificados (Elo de puzzles) y contrarreloj de 3 minutos. Generados con Stockfish a partir de errores
   en partidas (`scripts/gen-puzzles.mjs`).
 - **Coordenadas**: 30 segundos para encontrar casillas, desde blancas o negras.

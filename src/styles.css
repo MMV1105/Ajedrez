@@ -1669,3 +1669,18 @@ td.strong {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Entrenador por fases ---------- */
+.trainer-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin: 0.9rem 0 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+.trainer-move {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
