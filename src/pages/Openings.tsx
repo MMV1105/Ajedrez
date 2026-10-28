@@ -3,7 +3,7 @@ import { Chess } from 'chess.js';
 import Board, { type MoveInput } from '../components/Board';
 import EvalBar from '../components/EvalBar';
 import { Engine } from '../lib/engine';
-import { CLASS_INFO, evalPosition, evalToCp, judgeMove, playerAccuracy, type Classification, type PositionEval } from '../lib/analysis';
+import { CLASS_INFO, evalPosition, evalToCp, isMistake, judgeMove, playerAccuracy, type Classification, type PositionEval } from '../lib/analysis';
 import { bookKey, bookMoves, bookName, loadBook, loadSessions, pickBookMove, saveSession, type Book, type OpeningSession } from '../lib/openings';
 import { playMoveSound } from '../lib/sound';
 import { load, save } from '../lib/storage';
@@ -141,7 +141,7 @@ function OpeningPractice() {
         color: c,
         bookPlies,
         accuracy: mine.length ? playerAccuracy(mine.map((i) => judgedNow[i].accuracy)) : null,
-        errors: mine.filter((i) => ['error', 'grave'].includes(judgedNow[i].cls)).length,
+        errors: mine.filter((i) => isMistake(judgedNow[i].cls)).length,
         finalEval: lastEval ? clamp((c === 'w' ? 1 : -1) * evalToCp(lastEval)) : 0,
       };
       saveSession(s);
@@ -328,7 +328,7 @@ function OpeningPractice() {
   const tagOf = (i: number) => {
     const j = judged[i];
     if (!j) return null;
-    const bad = ['imprecision', 'error', 'grave'].includes(j.cls);
+    const bad = j.cls === 'imprecision' || isMistake(j.cls);
     if (line.inBook[i] && !bad) return { icon: 'T', color: BOOK_COLOR, label: 'Teoría' };
     const info = CLASS_INFO[j.cls];
     return { icon: info.icon, color: info.color, label: line.inBook[i] ? `${info.label} (es teoría, pero dudosa)` : info.label };

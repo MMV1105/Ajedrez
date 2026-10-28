@@ -14,10 +14,13 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
 - **Precisión en directo**: un segundo motor valora cada jugada tuya mientras juegas.
 - **Análisis de partidas**: tus partidas de chess.com (API pública, sin login), las jugadas contra los bots o un PGN pegado.
   Barra y gráfica de evaluación, precisión por jugador y clasificación de cada jugada
-  (brillante, gran jugada, mejor, excelente, buena, imprecisión, error, error grave) con la mejor alternativa.
-  La nota combina la probabilidad de ganar perdida (como Lichess) con los centipeones perdidos, así que también
-  castiga los errores en posiciones ya decididas. Además mide la **presión**: el porcentaje de jugadas que dejan
-  al rival con una sola respuesta buena.
+  (brillante, gran jugada, mejor, excelente, buena, teoría, imprecisión, error, ocasión fallada, error grave)
+  con la mejor alternativa. La valoración sigue el modelo de puntos esperados de chess.com: cada evaluación se pasa
+  a EP = 1 / (1 + 10^(−cp/400)) y la nota sale de los puntos esperados perdidos frente a la mejor jugada
+  (excelente ≤ 0,02, buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20). Brillante es un sacrificio
+  de al menos 2 puntos que no empeora la posición; gran jugada, la única buena (la segunda pierde ≥ 0,15); ocasión
+  fallada, no aprovechar un error del rival. La precisión de cada jugada es 100·e^(−3,2·ΔEP) y la de la partida, su
+  media. Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
 - **Aperturas guiadas**: en tu turno, la mejor jugada con su porqué (o las 3 mejores con los centipeones que pierde
@@ -62,3 +65,20 @@ node scripts/build-lessons.mjs                    # verifica y genera src/data/l
 ## Licencia
 
 Stockfish.js es GPLv3, así que si se distribuye la app el código también debe publicarse como GPLv3.
+
+## Servidor propio con Stockfish completo
+
+En GitHub Pages la web usa Stockfish 19 lite en el navegador. Si se sirve desde un servidor propio con
+`server/index.mjs`, usa el Stockfish 19 nativo del servidor por WebSocket (`/engine`), mucho más fuerte y rápido.
+Si el servidor no responde, sigue con el lite.
+
+En un Ubuntu (por ejemplo Oracle Cloud Ampere A1, ARM), todo se instala con:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/MMV1105/Ajedrez/main/server/install.sh | bash
+```
+
+El script compila Stockfish 19 para la CPU, construye la web, la deja como servicio (`jaque`) y pone Caddy delante con
+HTTPS (con dominio propio: `... | bash -s -- midominio.com`; sin él, `<ip>.sslip.io`). Con
+`JAQUE_PASSWORD=... bash` la web pide usuario `jaque` y esa contraseña. Para actualizar, se vuelve a ejecutar.
+La configuración del motor (hilos, memoria, número de motores) está en `/etc/jaque.env`.

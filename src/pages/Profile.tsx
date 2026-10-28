@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { Engine } from '../lib/engine';
 import { analyzeGame } from '../lib/analysis';
+import { loadBook } from '../lib/openings';
 import { fetchArchives, fetchMonth, resultFor } from '../lib/chesscom';
 import { buildProfile, summarizeGame, type GameSummary, type Profile as ProfileData } from '../lib/profile';
 import { navigate } from '../lib/nav';
@@ -18,8 +19,9 @@ const CLASSES = [
 ] as const;
 
 const DEPTH = 12;
+const DEPTH_SERVER = 16; // con el Stockfish completo del servidor se puede ir más hondo
 // Sube la versión cuando cambie la forma de puntuar, para no mezclar notas viejas y nuevas.
-const SUMMARIES_KEY = 'summaries2';
+const SUMMARIES_KEY = 'summaries3';
 
 export default function Profile() {
   const [source, setSource] = useState<'chesscom' | 'local'>('chesscom');
@@ -91,6 +93,8 @@ export default function Profile() {
       const pending = await collect();
       if (!pending.length) throw new Error('No hay partidas que analizar con esos filtros.');
       engineRef.current ??= new Engine();
+      await engineRef.current.ready;
+      const book = await loadBook();
       const cache = load<Record<string, GameSummary>>(SUMMARIES_KEY, {});
       const summaries: GameSummary[] = [];
       for (let i = 0; i < pending.length; i++) {
@@ -104,7 +108,7 @@ export default function Profile() {
           } catch {
             continue;
           }
-          const a = await analyzeGame(engineRef.current, p.pgn, DEPTH, (d, t) => id === runId.current && setProgress({ game: i + 1, total: pending.length, pos: d / t }), () => id !== runId.current);
+          const a = await analyzeGame(engineRef.current, p.pgn, engineRef.current.remote ? DEPTH_SERVER : DEPTH, (d, t) => id === runId.current && setProgress({ game: i + 1, total: pending.length, pos: d / t }), () => id !== runId.current, book);
           if (!a) return;
           if (a.moves.length < 10) continue; // partidas demasiado cortas no dicen nada
           s = summarizeGame(a, p.pgn, { id: p.id, date: p.date, color: p.color, result: p.result, timeClass: p.timeClass });
