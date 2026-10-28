@@ -20,6 +20,9 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
+- **Aperturas guiadas**: en tu turno, la mejor jugada con su porqué (o las 3 mejores con los centipeones que pierde
+  cada una), la amenaza del rival y cómo defenderla; tras tu jugada, las respuestas posibles del rival con la réplica
+  recomendada a cada una. Opción de ponerte a prueba (la pista sale después de jugar).
 - **Aperturas desde el inicio**: juegas desde la primera jugada; el rival responde con teoría variada (o sigue la
   apertura que elijas) y cada jugada se marca como teoría o con su nota. Se puede deshacer, ver las jugadas de teoría y
   consultar el historial de sesiones. El libro sale de [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings)
