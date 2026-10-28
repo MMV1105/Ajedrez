@@ -9,6 +9,7 @@ export type ChessComGame = {
   rated: boolean;
   white: { username: string; rating: number; result: string };
   black: { username: string; rating: number; result: string };
+  accuracies?: { white: number; black: number }; // solo si la partida se ha revisado en chess.com
 };
 
 const BASE = 'https://api.chess.com/pub/player';
