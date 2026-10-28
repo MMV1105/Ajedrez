@@ -37,7 +37,7 @@ function endgameName(fen: string) {
 export const ALL_SPOTS = (SPOTS as Spot[]).map((s) => (s.name === 'Final' ? { ...s, name: endgameName(s.fen) } : s));
 
 export const PHASE_INFO: Record<TrainerPhase, { title: string; path: string; text: string }> = {
-  apertura: { title: 'Aperturas', path: 'aperturas', text: 'Sal de la teoría sin perder la igualdad, o castiga el error del rival.' },
+  apertura: { title: 'Aperturas', path: 'aperturas', text: 'Juega desde la primera jugada con teoría variada, o sal de posiciones concretas sin perder la igualdad.' },
   medio: { title: 'Medio juego', path: 'medio-juego', text: 'Posiciones de partidas reales: mantén el equilibrio, aprovecha fallos o defiéndete.' },
   final: { title: 'Finales', path: 'finales', text: 'Convierte la ventaja, aguanta las tablas y repasa los finales clásicos.' },
 };
