@@ -6,6 +6,8 @@ import { Engine } from '../lib/engine';
 import { playMoveSound, sound } from '../lib/sound';
 import { load, save } from '../lib/storage';
 import LESSONS from '../data/lessons.json';
+import OPENING_LESSONS from '../data/opening-lessons.json';
+import OpeningLesson, { type OpeningLessonData } from './OpeningLesson';
 
 type Step =
   | { type: 'info'; text: string; fen: string; arrows?: [string, string][] }
@@ -14,13 +16,24 @@ type Step =
 
 type Lesson = { id: string; title: string; level: string; steps: Step[] };
 const ALL = LESSONS as Lesson[];
+const OPENINGS = OPENING_LESSONS as OpeningLessonData[];
 
 export default function Lessons() {
   const [done, setDone] = useState<Record<string, boolean>>(() => load('lessonsDone', {}));
   const [lessonId, setLessonId] = useState<string | null>(null);
 
+  const complete = (id: string) => {
+    const d = { ...done, [id]: true };
+    setDone(d);
+    save('lessonsDone', d);
+  };
+
   if (!lessonId) {
     const groups = [...new Set(ALL.map((l) => l.level))];
+    const openingGroups = [
+      { title: 'Aperturas (juegas con blancas)', side: 'w' },
+      { title: 'Defensas (juegas con negras)', side: 'b' },
+    ];
     return (
       <div className="page narrow">
         <h1 className="page-title">Lecciones</h1>
@@ -30,8 +43,25 @@ export default function Lessons() {
             <div className="lesson-grid">
               {ALL.filter((l) => l.level === g).map((l, i) => (
                 <button key={l.id} className={`lesson-card ${done[l.id] ? 'done' : ''}`} style={{ animationDelay: `${i * 60}ms` }} onClick={() => setLessonId(l.id)}>
-                                    <strong>{l.title}</strong>
+                  <strong>{l.title}</strong>
                   <span className="muted small">{l.steps.length} pasos</span>
+                  {done[l.id] && <span className="done-badge">✓</span>}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+        {openingGroups.map((g) => (
+          <section key={g.side}>
+            <h3 className="group-title">{g.title}</h3>
+            <p className="muted small">Ordenadas de más a menos jugadas. En cada una juegas la teoría contra las respuestas más habituales del rival.</p>
+            <div className="lesson-grid">
+              {OPENINGS.filter((l) => l.side === g.side).map((l, i) => (
+                <button key={l.id} className={`lesson-card ${done[l.id] ? 'done' : ''}`} style={{ animationDelay: `${i * 40}ms` }} onClick={() => setLessonId(l.id)}>
+                  <strong>{l.title}</strong>
+                  <span className="muted small">
+                    {l.branches.length} {l.branches.length === 1 ? 'línea' : 'líneas'}
+                  </span>
                   {done[l.id] && <span className="done-badge">✓</span>}
                 </button>
               ))}
@@ -42,16 +72,15 @@ export default function Lessons() {
     );
   }
 
+  const opening = OPENINGS.find((l) => l.id === lessonId);
+  if (opening) return <OpeningLesson lesson={opening} onExit={() => setLessonId(null)} onComplete={() => complete(opening.id)} />;
+
   const lesson = ALL.find((l) => l.id === lessonId)!;
   return (
     <LessonPlayer
       lesson={lesson}
       onExit={() => setLessonId(null)}
-      onComplete={() => {
-        const d = { ...done, [lesson.id]: true };
-        setDone(d);
-        save('lessonsDone', d);
-      }}
+      onComplete={() => complete(lesson.id)}
     />
   );
 }

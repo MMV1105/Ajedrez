@@ -40,7 +40,11 @@ function ImportRatings({ onDone }: { onDone: () => void }) {
         ['puzzles', st.tactics?.highest?.rating],
       ];
       let n = 0;
-      for (const [c, r] of pairs) if (r) (setInitialRating(c, r), n++);
+      for (const [c, r] of pairs) {
+        if (!r) continue;
+        setInitialRating(c, r);
+        n++;
+      }
       setStatus(n ? `¡Listo! ${n} puntuaciones importadas.` : 'Ese usuario no tiene puntuaciones públicas.');
       onDone();
     } catch (err) {
