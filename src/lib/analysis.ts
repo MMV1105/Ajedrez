@@ -101,12 +101,14 @@ export function expectedPoints(cp: number) {
 
 // Pérdida máxima de puntos esperados (ΔEP) para cada nota; por encima de la última, error grave.
 const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
-// Precisión de cada jugada: 100·e^(−k·pérdida), con la pérdida = 25 % la ΔEP anclada en 0 y 75 % la ΔEP real
-// (la que pierdes según cómo va la partida). k = 14 y ese reparto son los que mejor reproducen a la vez la
-// precisión de chess.com en 99 partidas reales (se desvía 5,2 de media; antes 8,3) y la de Chessigma en otras 61 (4,6; antes 6,8).
-// Igualados: 20 cp perdidos → 86, 1 peón → 48, 2 peones → 24.
-const ACCURACY_K = 14;
-const ANCHOR_WEIGHT = 0.25;
+// Precisión de cada jugada: 100·e^(−k·pérdida), con la pérdida = 10 % la ΔEP anclada en 0 y 90 % la ΔEP real
+// (la que pierdes según cómo va la partida, con la curva más suave de escala 1300); 100 si es la del motor o teoría.
+// k, el reparto, la escala y la media de la partida (abajo) están ajustados solo con chess.com, en 99 partidas
+// reales: se desvía 4,6 de media (5,2 antes; 4,7 en partidas que no se usaron para ajustar).
+// Igualados: 20 cp perdidos → 89, 1 peón → 54, 2 peones → 30.
+const ACCURACY_K = 13.5;
+const ANCHOR_WEIGHT = 0.1;
+const REAL_SCALE = 1300;
 // Gran jugada: la segunda mejor pierde al menos esto (ajustado con 4.200 jugadas de Chessigma).
 const GREAT_GAP = 0.12;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
@@ -164,8 +166,6 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const still = cpBefore * cpAfter > 0 ? Math.min(Math.abs(cpBefore), Math.abs(cpAfter), DECIDED_CAP) : 0;
   const tolerance = 1 + (DECIDED_PER_PAWN * Math.max(0, still - DECIDED_FROM)) / 100;
   const gradeLoss = best ? 0 : anchoredLoss(gradeCpl / tolerance);
-  const realLoss = best ? 0 : Math.max(0, epBefore - epAfter);
-  const accuracy = 100 * Math.exp(-ACCURACY_K * (ANCHOR_WEIGHT * epLoss + (1 - ANCHOR_WEIGHT) * realLoss));
 
   // Sacrificio: dejas una pieza para que la coman (tras su respuesta pierdes 2 puntos netos o más y no recuperas
   // en esa misma casilla) o, tras la línea del motor (o al acabar en tu mate), has entregado 2 puntos netos o más.
@@ -218,13 +218,16 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
   const pressure = !decided && after.goodMoves === 1 && new Chess(move.after).moves().length > 1;
+  const realEp = (cp: number) => 1 / (1 + Math.pow(10, -cp / REAL_SCALE));
+  const realLoss = best ? 0 : Math.max(0, realEp(cpBefore) - realEp(cpAfter));
+  const accuracy = cls === 'teoria' ? 100 : 100 * Math.exp(-ACCURACY_K * (ANCHOR_WEIGHT * epLoss + (1 - ANCHOR_WEIGHT) * realLoss));
   return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
 }
 
-// Precisión de la partida: media de las raíces de la precisión de cada jugada, al cuadrado. Pesa más los
-// fallos que la media aritmética (un 0 entre dieciocho 100 da 89, no 95), como chess.com.
+// Precisión de la partida: media de las raíces cúbicas de la precisión de cada jugada, al cubo. Pesa más los
+// fallos que la media aritmética (un 0 entre dieciocho 100 da 85, no 95), como chess.com.
 export function playerAccuracy(xs: number[]) {
-  return xs.length ? (xs.reduce((a, b) => a + Math.sqrt(b), 0) / xs.length) ** 2 : 0;
+  return xs.length ? (xs.reduce((a, b) => a + Math.cbrt(b), 0) / xs.length) ** 3 : 0;
 }
 
 export const isMistake = (c: Classification) => c === 'error' || c === 'fallo' || c === 'grave';
