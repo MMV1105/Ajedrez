@@ -110,6 +110,7 @@ const GREAT_GAP = 0.15;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
 const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
+const BRILLIANT_FLOOR = -200;
 // Mate forzado que se deja escapar sin perder la posición ganadora (sigues a +3 o más): ocasión fallada,
 // y la precisión se calcula como si perdieras un peón.
 const MISSED_MATE_WINNING = 300;
@@ -172,8 +173,8 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   let cls: Classification;
   if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
   else if (missedMate) cls = 'fallo';
-  // Brillante: ΔEP ≤ 0,02 (la posición no empeora) y entrega material; no cuenta si ya te están dando mate.
-  else if (epLoss <= LIMITS.excelente && !(before.mate !== null && sign * before.mate < 0) && sacrifice()) cls = 'brillante';
+  // Brillante: ΔEP ≤ 0,02 (la posición no empeora) y entrega material; no cuenta si ya estás perdido (−2 o peor).
+  else if (epLoss <= LIMITS.excelente && cpAfter > BRILLIANT_FLOOR && sacrifice()) cls = 'brillante';
   else if (best) {
     // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15 (con la evaluación real:
     // es la única jugada que mantiene el resultado).
