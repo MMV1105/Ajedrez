@@ -101,9 +101,9 @@ const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
 // Pendiente de la precisión por jugada: 100·e^(−k·pérdida). Con 3.2: perder 0.05 → 85, 0.1 → 73, 0.2 → 53.
 const ACCURACY_K = 3.2;
 // Los puntos esperados apenas cambian cuando ya vas muy perdido (de −8 a −12 casi no se mueven), así que
-// regalar material en una partida perdida no contaría. Por eso la pérdida es también, como mínimo, los
-// centipeones perdidos / CP_SCALE (800: perder un peón son 0,125, un error), salvo si tras la jugada sigues
-// ganando claramente (+3 o más): ahí elegir un camino más largo a la victoria no se castiga igual.
+// regalar material en una partida perdida no contaría, y lo mismo con los errores del que va ganando. Por eso
+// la pérdida es también, como mínimo, los centipeones perdidos / CP_SCALE (800: perder un peón son 0,125, un
+// error), contando las evaluaciones hasta ±15.
 const CP_SCALE = 800;
 const CP_CLAMP = 1500;
 
@@ -122,7 +122,7 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const cpLoss = Math.max(0, clampCp(cpBefore) - clampCp(cpAfter));
   const bigCpLoss = Math.max(0, Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpBefore)) - Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpAfter)));
   const epDrop = Math.max(0, epBefore - epAfter);
-  const epLoss = cpAfter >= 300 ? epDrop : Math.max(epDrop, bigCpLoss / CP_SCALE);
+  const epLoss = Math.max(epDrop, bigCpLoss / CP_SCALE);
   const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
   const uci = move.from + move.to + (move.promotion ?? '');
   const best = uci === before.best || (epLoss < 0.001 && cpLoss <= 5);
