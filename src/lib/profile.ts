@@ -73,7 +73,7 @@ export function summarizeGame(
   a.moves.forEach((m, i) => {
     if (m.color !== me) return;
     const p = phaseOf(m.fenBefore, i);
-    phase[p][0] += Math.sqrt(m.accuracy); // como playerAccuracy: media de raíces, al cuadrado
+    phase[p][0] += Math.cbrt(m.accuracy); // como playerAccuracy: media de raíces cúbicas, al cubo
     phase[p][1] += 1;
     phase[p][2] += 1 / Math.max(m.accuracy, 1);
   });
@@ -135,8 +135,8 @@ export function buildProfile(gs: GameSummary[]): Profile {
   const phases = PHASES.map((p) => {
     const sum = gs.reduce((s, g) => s + g.phase[p][0], 0);
     const cnt = gs.reduce((s, g) => s + g.phase[p][1], 0);
-    // Igual que la precisión de cada partida: media de raíces, al cuadrado.
-    return { phase: p, accuracy: cnt >= 6 ? (sum / cnt) ** 2 : null };
+    // Igual que la precisión de cada partida: media de raíces cúbicas, al cubo.
+    return { phase: p, accuracy: cnt >= 6 ? (sum / cnt) ** 3 : null };
   });
 
   const aggr = avg(gs.map((g) => g.aggressive));

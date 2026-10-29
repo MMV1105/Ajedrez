@@ -20,11 +20,12 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   con ΔEP = 0,5 − EP(−CPL) (mejor = 0, excelente ≤ 0,02, buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20;
   unos 38, 96, 194 y 405 cp). Si sigues ganando (o perdiendo) tras la jugada, lo perdido se divide por 1 + 0,2 por peón de
   ventaja por encima de +2,5 (como mucho entre 2,5), y un mate vale como mucho 15 peones para la nota: un error se sigue
-  marcando, pero más suave que con la partida igualada. La precisión de cada jugada es 100·e^(−14·pérdida), con la pérdida
-  = 25 % la ΔEP anclada y 75 % la real (100 si es la del motor), y la de la partida es la media de sus raíces al cuadrado.
+  marcando, pero más suave que con la partida igualada. La precisión de cada jugada es 100·e^(−13,5·pérdida), con la pérdida
+  = 10 % la ΔEP anclada y 90 % la real (escala 1300; 100 si es la del motor o teoría), y la de la partida es la media de
+  sus raíces cúbicas al cubo.
   Todo está ajustado con partidas reales del autor: las notas coinciden con las de Chessigma en el 93 % de 4.200
-  jugadas (bien / imprecisión / error / grave; 97 % con la partida igualada) y la precisión se desvía unos 5 puntos de
-  chess.com (99 partidas, Stockfish 19 a profundidad 14) y 4,6 de Chessigma. Brillante: la mejor jugada dejando una pieza
+  jugadas (bien / imprecisión / error / grave; 97 % con la partida igualada) y la precisión, ajustada solo con chess.com, se
+  desvía 4,6 puntos de media de la suya en 99 partidas (Stockfish 19 a profundidad 14; 3 de cada 4 a 5 puntos o menos). Brillante: la mejor jugada dejando una pieza
   para que la coman (2 puntos netos o más) sin estar perdido ni ganando ya de +6; gran jugada: la única buena (la segunda
   pierde ≥ 0,12 de EP real), sin contar recapturas; ocasión fallada: devolver lo que el rival regaló con un error, o dejar
   escapar un mate forzado sin perder la posición ganadora (cuenta como perder un peón). Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
