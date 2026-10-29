@@ -96,10 +96,16 @@ export function expectedPoints(cp: number) {
   return 1 / (1 + Math.pow(10, -cp / 400));
 }
 
-// Pérdida máxima de puntos esperados para cada nota; por encima de la última, error grave.
+// Pérdida máxima para cada nota; por encima de la última, error grave.
 const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
-// Pendiente de la precisión por jugada: 100·e^(−k·ΔEP). Con 3.2: perder 0.05 → 85, 0.1 → 73, 0.2 → 53.
+// Pendiente de la precisión por jugada: 100·e^(−k·pérdida). Con 3.2: perder 0.05 → 85, 0.1 → 73, 0.2 → 53.
 const ACCURACY_K = 3.2;
+// Los puntos esperados apenas cambian cuando ya vas muy perdido (de −8 a −12 casi no se mueven), así que
+// regalar material en una partida perdida no contaría. Por eso la pérdida es también, como mínimo, los
+// centipeones perdidos / CP_SCALE (800: perder un peón son 0,125, un error), salvo si tras la jugada sigues
+// ganando claramente (+3 o más): ahí elegir un camino más largo a la victoria no se castiga igual.
+const CP_SCALE = 800;
+const CP_CLAMP = 1500;
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
@@ -113,8 +119,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const cpAfter = sign * evalToCp(after);
   const epBefore = expectedPoints(cpBefore);
   const epAfter = expectedPoints(cpAfter);
-  const epLoss = Math.max(0, epBefore - epAfter);
   const cpLoss = Math.max(0, clampCp(cpBefore) - clampCp(cpAfter));
+  const bigCpLoss = Math.max(0, Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpBefore)) - Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpAfter)));
+  const epDrop = Math.max(0, epBefore - epAfter);
+  const epLoss = cpAfter >= 300 ? epDrop : Math.max(epDrop, bigCpLoss / CP_SCALE);
   const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
   const uci = move.from + move.to + (move.promotion ?? '');
   const best = uci === before.best || (epLoss < 0.001 && cpLoss <= 5);
@@ -154,9 +162,13 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
 }
 
-// Precisión de la partida: media de la precisión de cada jugada.
+// Precisión de la partida: media entre la media normal y la armónica, que pesa más las jugadas malas
+// (con la media normal, unos pocos errores graves entre muchas jugadas fáciles apenas bajan la nota).
 export function playerAccuracy(xs: number[]) {
-  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+  if (!xs.length) return 0;
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const harmonic = xs.length / xs.reduce((a, b) => a + 1 / Math.max(b, 1), 0);
+  return (mean + harmonic) / 2;
 }
 
 export const isMistake = (c: Classification) => c === 'error' || c === 'fallo' || c === 'grave';
