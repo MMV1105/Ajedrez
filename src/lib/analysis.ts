@@ -90,6 +90,8 @@ export function linesToEval(fen: string, lines: Line[]): PositionEval {
 
 // Valoración al estilo de chess.com: cada evaluación se pasa a puntos esperados (EP, de 0 a 1)
 // y la nota de la jugada sale de cuántos puntos esperados pierde frente a la mejor.
+// La pérdida se mide como si la partida estuviera igualada (anclada en 0): los centipeones que pierdes
+// frente a la mejor jugada (CPL) se llevan de 0 a −CPL, así que un error pesa igual vayas como vayas.
 export function expectedPoints(cp: number) {
   return 1 / (1 + Math.pow(10, -cp / 400));
 }
@@ -103,22 +105,16 @@ const GREAT_GAP = 0.15;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
 const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
-// La misma pérdida medida en centipeones frente a la mejor jugada (CPL), igual vayas como vayas.
-// Equivalencias de la tabla: ≤ 20 excelente, ≤ 45 buena, ≤ 90 imprecisión, ≤ 180 error; por encima, error grave.
-const CPL_LIMITS = { excelente: 20, buena: 45, imprecision: 90, error: 180 };
-// Precisión por CPL: 100·e^(−k·CPL), con k tal que en igualdad da lo mismo que la de ΔEP (3,2 · ln 10 / 1600 ≈ 0,0046).
-const CPL_ACCURACY_K = (ACCURACY_K * Math.LN10) / 1600;
 // Mate forzado que se deja escapar sin perder la posición ganadora (sigues a +3 o más): ocasión fallada,
 // y la precisión se calcula como si perdieras un peón.
 const MISSED_MATE_WINNING = 300;
 const MISSED_MATE_CPL = 100;
-const SEVERITY: Classification[] = ['excelente', 'buena', 'imprecision', 'error', 'grave'];
-const grade = (loss: number, limits: typeof LIMITS) =>
-  loss <= limits.excelente ? 'excelente' : loss <= limits.buena ? 'buena' : loss <= limits.imprecision ? 'imprecision' : loss <= limits.error ? 'error' : 'grave';
+// ΔEP anclado en 0: 0,5 − EP(−CPL). Los límites equivalen a unos 14, 35, 70 y 147 cp perdidos.
+export const anchoredLoss = (cpl: number) => 0.5 - expectedPoints(-cpl);
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
-  prevLoss?: number; // ΔEP de la jugada anterior del rival
+  prevLoss?: number; // ΔEP (anclado) de la jugada anterior del rival
 };
 
 export function judgeMove(move: Move, before: PositionEval, after: PositionEval, ctx: MoveContext = {}) {
@@ -132,12 +128,11 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const hadMate = before.mate !== null && sign * before.mate > 0;
   const keepsMate = after.mate !== null && cpAfter > 0; // sigue habiendo mate a favor (o ya lo has dado)
   const missedMate = hadMate && !keepsMate && uci !== before.best && cpAfter >= MISSED_MATE_WINNING;
-  const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
   // CPL, sin recortar: simplificar también cuenta si no es lo óptimo.
   const cpLoss = missedMate ? MISSED_MATE_CPL : Math.max(0, cpBefore - cpAfter);
   const best = uci === before.best || cpLoss === 0;
-  // Se mide de las dos formas y cuenta la peor: así se pierde ventaja igual vayas ganando, igualado o perdiendo.
-  const accuracy = best ? 100 : Math.min(100 * Math.exp(-ACCURACY_K * epLoss), 100 * Math.exp(-CPL_ACCURACY_K * cpLoss));
+  const epLoss = best ? 0 : anchoredLoss(cpLoss); // ΔEP como si la partida estuviera igualada
+  const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
 
   // Sacrificio: tras la línea del motor (o al acabar en tu mate) has entregado al menos 2 puntos netos de material.
   const sacrifice = () => {
@@ -166,20 +161,22 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   let cls: Classification;
   if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
   else if (missedMate) cls = 'fallo';
-  // Brillante: ΔEP ≤ 0,02, entrega material y la posición no empeora (la evaluación no baja más de 20 cp,
-  // el equivalente de "excelente"; si no, en una partida ya perdida colgar piezas saldría brillante).
-  else if (epLoss <= LIMITS.excelente && cpBefore - cpAfter <= 20 && sacrifice()) cls = 'brillante';
+  // Brillante: ΔEP ≤ 0,02 (la posición no empeora) y entrega material.
+  else if (epLoss <= LIMITS.excelente && sacrifice()) cls = 'brillante';
   else if (best) {
-    // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15.
+    // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15 (con la evaluación real:
+    // es la única jugada que mantiene el resultado).
     const second = before.second === null ? null : expectedPoints(sign * before.second);
     cls = second !== null && epBefore - second >= GREAT_GAP ? 'gran' : 'mejor';
   } else {
-    const byEp = grade(epLoss, LIMITS);
-    const byCp = grade(cpLoss, CPL_LIMITS);
-    cls = SEVERITY.indexOf(byCp) > SEVERITY.indexOf(byEp) ? byCp : byEp;
+    if (epLoss <= LIMITS.excelente) cls = 'excelente';
+    else if (epLoss <= LIMITS.buena) cls = 'buena';
+    else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
+    else if (epLoss <= LIMITS.error) cls = 'error';
+    else cls = 'grave';
     // Ocasión fallada: el rival acababa de cometer un error grave y no lo castigas: devuelves lo que te había regalado.
     const prev = ctx.prevLoss ?? 0;
-    if ((cls === 'error' || cls === 'grave') && prev > LIMITS.error && epAfter >= epBefore - prev - 0.05) cls = 'fallo';
+    if ((cls === 'error' || cls === 'grave') && prev > LIMITS.error && epLoss <= prev + 0.05) cls = 'fallo';
   }
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
