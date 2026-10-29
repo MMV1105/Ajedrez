@@ -88,8 +88,6 @@ export function linesToEval(fen: string, lines: Line[]): PositionEval {
   };
 }
 
-const clampCp = (v: number) => Math.max(-1000, Math.min(1000, v));
-
 // Valoración al estilo de chess.com: cada evaluación se pasa a puntos esperados (EP, de 0 a 1)
 // y la nota de la jugada sale de cuántos puntos esperados pierde frente a la mejor.
 export function expectedPoints(cp: number) {
@@ -105,9 +103,14 @@ const GREAT_GAP = 0.15;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
 const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
-// Filtro anti-inflación: nota mínima según la pérdida bruta de centipeones (CPL), vayas como vayas.
-// No se aplica a la mejor jugada, a la teoría ni a los brillantes.
-const CPL = { grave: 400, error: 250, imprecision: 150 };
+// La misma pérdida medida en centipeones frente a la mejor jugada (CPL), igual vayas como vayas.
+// Equivalencias de la tabla: ≤ 20 excelente, ≤ 45 buena, ≤ 90 imprecisión, ≤ 180 error; por encima, error grave.
+const CPL_LIMITS = { excelente: 20, buena: 45, imprecision: 90, error: 180 };
+// Precisión por CPL: 100·e^(−k·CPL), con k tal que en igualdad da lo mismo que la de ΔEP (3,2 · ln 10 / 1600 ≈ 0,0046).
+const CPL_ACCURACY_K = (ACCURACY_K * Math.LN10) / 1600;
+const SEVERITY: Classification[] = ['excelente', 'buena', 'imprecision', 'error', 'grave'];
+const grade = (loss: number, limits: typeof LIMITS) =>
+  loss <= limits.excelente ? 'excelente' : loss <= limits.buena ? 'buena' : loss <= limits.imprecision ? 'imprecision' : loss <= limits.error ? 'error' : 'grave';
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
@@ -119,16 +122,14 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const sign = color === 'w' ? 1 : -1;
   const cpBefore = sign * evalToCp(before);
   const cpAfter = sign * evalToCp(after);
-  // Las evaluaciones se recortan a ±1000 cp: más allá, la victoria ya es trivial.
-  const cpB = clampCp(cpBefore);
-  const cpA = clampCp(cpAfter);
-  const epBefore = expectedPoints(cpB); // EP de la mejor jugada
-  const epAfter = expectedPoints(cpA); // EP tras tu jugada
+  const epBefore = expectedPoints(cpBefore); // EP de la mejor jugada
+  const epAfter = expectedPoints(cpAfter); // EP tras tu jugada
   const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
-  const cpLoss = Math.max(0, cpB - cpA); // CPL
-  const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
+  const cpLoss = Math.max(0, cpBefore - cpAfter); // CPL, sin recortar: simplificar también cuenta si no es lo óptimo
   const uci = move.from + move.to + (move.promotion ?? '');
-  const best = uci === before.best || epLoss === 0;
+  const best = uci === before.best || cpLoss === 0;
+  // Se mide de las dos formas y cuenta la peor: así se pierde ventaja igual vayas ganando, igualado o perdiendo.
+  const accuracy = best ? 100 : Math.min(100 * Math.exp(-ACCURACY_K * epLoss), 100 * Math.exp(-CPL_ACCURACY_K * cpLoss));
 
   // Sacrificio: tras la línea del motor (o al acabar en tu mate) has entregado al menos 2 puntos netos de material.
   const sacrifice = () => {
@@ -164,15 +165,9 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
     const second = before.second === null ? null : expectedPoints(sign * before.second);
     cls = second !== null && epBefore - second >= GREAT_GAP ? 'gran' : 'mejor';
   } else {
-    if (epLoss <= LIMITS.excelente) cls = 'excelente';
-    else if (epLoss <= LIMITS.buena) cls = 'buena';
-    else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
-    else if (epLoss <= LIMITS.error) cls = 'error';
-    else cls = 'grave';
-    // Filtro anti-inflación por CPL: con mucha ventaja el ΔEP es pequeño aunque regales material.
-    if (cpLoss >= CPL.grave) cls = 'grave';
-    else if (cpLoss >= CPL.error && cls !== 'grave') cls = 'error';
-    else if (cpLoss >= CPL.imprecision && (cls === 'excelente' || cls === 'buena')) cls = 'imprecision';
+    const byEp = grade(epLoss, LIMITS);
+    const byCp = grade(cpLoss, CPL_LIMITS);
+    cls = SEVERITY.indexOf(byCp) > SEVERITY.indexOf(byEp) ? byCp : byEp;
     // Ocasión fallada: el rival acababa de cometer un error grave y no lo castigas: devuelves lo que te había regalado.
     const prev = ctx.prevLoss ?? 0;
     if ((cls === 'error' || cls === 'grave') && prev > LIMITS.error && epAfter >= epBefore - prev - 0.05) cls = 'fallo';
