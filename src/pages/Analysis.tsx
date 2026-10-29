@@ -88,6 +88,27 @@ export default function Analysis() {
     }
   }
 
+  // Partidas de los últimos tres meses revisadas en chess.com, con su precisión: sirven para calibrar la nuestra.
+  const [exporting, setExporting] = useState(false);
+  async function downloadReviewed() {
+    setExporting(true);
+    try {
+      const months = await Promise.all(archives.slice(0, 3).map(fetchMonth));
+      const rows = months.flat().filter((g) => g.accuracies).map((g) => ({ url: g.url, pgn: g.pgn, white: g.accuracies!.white, black: g.accuracies!.black }));
+      if (!rows.length) throw new Error('No hay partidas revisadas en chess.com en los últimos tres meses.');
+      const blob = new Blob([JSON.stringify(rows)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `jaque-calibrar-${username.trim().toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron descargar las partidas.');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function startAnalysis(p: string, d = depth, ref: ChessComGame['accuracies'] = undefined) {
     const id = ++runId.current;
     setChesscomAcc(ref ? { w: ref.white, b: ref.black } : null);
@@ -369,6 +390,11 @@ export default function Analysis() {
                 </option>
               ))}
             </select>
+          )}
+          {archives.length > 0 && (
+            <button className="btn ghost small" onClick={downloadReviewed} disabled={exporting}>
+              {exporting ? 'Preparando…' : 'Descargar partidas revisadas en chess.com (para calibrar)'}
+            </button>
           )}
           <div className="game-list">
             {games.map((g, i) => {
