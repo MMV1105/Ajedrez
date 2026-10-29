@@ -21,7 +21,7 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20; unos 38, 96, 194 y 405 cp). La escala de 1100 y la
   precisión de cada jugada, 100·e^(−23,45·ΔEP) (100 si es la del motor), están ajustadas para dar las mismas notas y
   precisiones que chess.com con Stockfish 19 a profundidad 18; la de la partida es la media aritmética. Brillante: ΔEP ≤ 0,02
-  dejando una pieza para que la coman (2 puntos netos o más); gran jugada: la única buena (la segunda pierde ≥ 0,15 de EP
+  dejando una pieza para que la coman (2 puntos netos o más) sin estar perdido; gran jugada: la única buena (la segunda pierde ≥ 0,15 de EP
   real), sin contar recapturas; ocasión fallada: devolver lo que el rival regaló con un error, o dejar escapar un mate
   forzado sin perder la posición ganadora (cuenta como perder un peón). Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
