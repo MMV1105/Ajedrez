@@ -17,9 +17,9 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   (brillante, gran jugada, mejor, excelente, buena, teoría, imprecisión, error, ocasión fallada, error grave)
   con la mejor alternativa. La valoración sigue el modelo de puntos esperados: cada evaluación se pasa
   a EP = 1 / (1 + 10^(−cp/400)), con la evaluación recortada a ±1000 cp, y la nota sale de ΔEP = EP de la mejor jugada − EP tras la tuya (mejor = 0,
-  excelente ≤ 0,02, buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20). Encima va un filtro de seguridad por pérdida bruta de centipeones (CPL):
-  si tras la jugada quedas por debajo de +3, CPL ≥ 350 es error grave, CPL ≥ 200 sube buena o excelente a error
-  y CPL ≥ 100 sube excelente a imprecisión; si sigues por encima de +3, CPL ≥ 350 nunca baja de error. Brillante: ΔEP ≤ 0,02
+  excelente ≤ 0,02, buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20). Encima va un filtro anti-inflación por pérdida bruta de centipeones
+  (CPL), vayas como vayas: CPL ≥ 400 es error grave, CPL ≥ 250 es al menos error y CPL ≥ 150 al menos imprecisión
+  (no se aplica a la mejor jugada, la teoría ni los brillantes). Brillante: ΔEP ≤ 0,02
   entregando al menos 2 puntos netos de material; gran jugada: la mejor, cuando la segunda tiene ΔEP ≥ 0,15;
   ocasión fallada: no castigar un error grave del rival. La precisión de cada jugada es 100·e^(−3,2·ΔEP) y la de la
   partida, la media aritmética. Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
