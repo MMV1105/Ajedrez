@@ -156,7 +156,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const missedMate = hadMate && !keepsMate && uci !== before.best && cpAfter >= MISSED_MATE_WINNING;
   // CPL, sin recortar: simplificar también cuenta si no es lo óptimo.
   const cpLoss = missedMate ? MISSED_MATE_CPL : Math.max(0, cpBefore - cpAfter);
-  const best = uci === before.best || cpLoss === 0;
+  // Mantener un mate a favor (aunque tarde más) o seguir recibiendo mate cuando ya era inevitable cuenta como la
+  // mejor: así lo hace Chessigma (subió del 78 % al 83 % de notas exactas iguales en partidas de prueba).
+  const stillMated = before.mate !== null && cpBefore < 0 && after.mate !== null && cpAfter < 0;
+  const best = uci === before.best || cpLoss === 0 || (hadMate && keepsMate) || stillMated;
   const epLoss = best ? 0 : anchoredLoss(cpLoss); // ΔEP como si la partida estuviera igualada
   // Pérdida para la nota (la precisión usa la de arriba, sin rebajas).
   const matedAfter = after.mate !== null && cpAfter < 0 && !(before.mate !== null && cpBefore < 0);

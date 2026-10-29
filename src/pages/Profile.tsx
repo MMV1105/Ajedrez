@@ -21,7 +21,7 @@ const CLASSES = [
 const DEPTH = 12;
 const DEPTH_SERVER = 16; // con el Stockfish completo del servidor se puede ir más hondo
 // Sube la versión cuando cambie la forma de puntuar, para no mezclar notas viejas y nuevas.
-const SUMMARIES_KEY = 'summaries15';
+const SUMMARIES_KEY = 'summaries16';
 
 export default function Profile() {
   const [source, setSource] = useState<'chesscom' | 'local'>('chesscom');
@@ -220,6 +220,9 @@ export default function Profile() {
               <span className="label">{profileLabel}</span>
               <div className="big-figure">{profile.accuracy.toFixed(1)}</div>
               <span className="muted">precisión media en {profile.games} partidas</span>
+              <p className="muted small" style={{ margin: '4px 0 0' }} title="Elo al que suele corresponder esa precisión en chess.com. Orientativo.">
+                juegas como un ~{profile.elo} de Elo
+              </p>
             </div>
             <div className="record">
               <div className="record-bar">
