@@ -88,8 +88,6 @@ export function linesToEval(fen: string, lines: Line[]): PositionEval {
   };
 }
 
-const clampCp = (v: number) => Math.max(-1000, Math.min(1000, v));
-
 // Valoración al estilo de chess.com: cada evaluación se pasa a puntos esperados (EP, de 0 a 1)
 // y la nota de la jugada sale de cuántos puntos esperados pierde frente a la mejor.
 export function expectedPoints(cp: number) {
@@ -124,13 +122,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const sign = color === 'w' ? 1 : -1;
   const cpBefore = sign * evalToCp(before);
   const cpAfter = sign * evalToCp(after);
-  // Las evaluaciones se recortan a ±1000 cp: más allá, la victoria ya es trivial.
-  const cpB = clampCp(cpBefore);
-  const cpA = clampCp(cpAfter);
-  const epBefore = expectedPoints(cpB); // EP de la mejor jugada
-  const epAfter = expectedPoints(cpA); // EP tras tu jugada
+  const epBefore = expectedPoints(cpBefore); // EP de la mejor jugada
+  const epAfter = expectedPoints(cpAfter); // EP tras tu jugada
   const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
-  const cpLoss = Math.max(0, cpB - cpA); // CPL
+  const cpLoss = Math.max(0, cpBefore - cpAfter); // CPL, sin recortar: simplificar también cuenta si no es lo óptimo
   const uci = move.from + move.to + (move.promotion ?? '');
   const best = uci === before.best || cpLoss === 0;
   // Se mide de las dos formas y cuenta la peor: así se pierde ventaja igual vayas ganando, igualado o perdiendo.
