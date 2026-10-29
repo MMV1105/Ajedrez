@@ -105,10 +105,9 @@ const GREAT_GAP = 0.15;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
 const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
-// Filtro de seguridad: por debajo de +3 tras la jugada se castiga la pérdida bruta de centipeones;
-// colgar una pieza (≥ 350 cp) nunca pasa de error aunque sigas ganando.
-const SAFE_ADVANTAGE = 300;
-const CPL_PIECE = 350;
+// Filtro anti-inflación: nota mínima según la pérdida bruta de centipeones (CPL), vayas como vayas.
+// No se aplica a la mejor jugada, a la teoría ni a los brillantes.
+const CPL = { grave: 400, error: 250, imprecision: 150 };
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
@@ -170,12 +169,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
     else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
     else if (epLoss <= LIMITS.error) cls = 'error';
     else cls = 'grave';
-    // Filtro de seguridad por CPL: con mucha ventaja el ΔEP es pequeño aunque regales material.
-    if (cpA < SAFE_ADVANTAGE) {
-      if (cpLoss >= CPL_PIECE) cls = 'grave';
-      else if (cpLoss >= 200 && (cls === 'excelente' || cls === 'buena')) cls = 'error';
-      else if (cpLoss >= 100 && cls === 'excelente') cls = 'imprecision';
-    } else if (cpLoss >= CPL_PIECE && (cls === 'excelente' || cls === 'buena')) cls = 'error';
+    // Filtro anti-inflación por CPL: con mucha ventaja el ΔEP es pequeño aunque regales material.
+    if (cpLoss >= CPL.grave) cls = 'grave';
+    else if (cpLoss >= CPL.error && cls !== 'grave') cls = 'error';
+    else if (cpLoss >= CPL.imprecision && (cls === 'excelente' || cls === 'buena')) cls = 'imprecision';
     // Ocasión fallada: el rival acababa de cometer un error grave y no lo castigas: devuelves lo que te había regalado.
     const prev = ctx.prevLoss ?? 0;
     if ((cls === 'error' || cls === 'grave') && prev > LIMITS.error && epAfter >= epBefore - prev - 0.05) cls = 'fallo';
