@@ -19,9 +19,10 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   a EP = 1 / (1 + 10^(−cp/400)) y la nota sale de la pérdida frente a la mejor jugada
   (excelente ≤ 0,02, buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20). Como los puntos
   esperados casi no cambian cuando la partida ya está decidida, la pérdida es como mínimo los centipeones perdidos
-  / 800, para que regalar material cuente igual vayas perdiendo o ganando. Brillante es un sacrificio
-  de al menos 2 puntos que no empeora la posición; gran jugada, la única buena (la segunda pierde ≥ 0,15); ocasión
-  fallada, no aprovechar un error del rival. La precisión de cada jugada es 100·e^(−3,2·pérdida) y la de la partida, la
+  / 800 para la precisión y / 1600 para la nota, con un tope si tras la jugada sigues a +3 o más. Brillante es
+  un sacrificio de al menos 2 puntos que sigue sin recuperarse dos jugadas después (o que lleva al mate) y no empeora
+  la posición; gran jugada, la única buena (la segunda pierde ≥ 0,15), sin contar recapturas; ocasión fallada, no
+  aprovechar un error del rival. La precisión de cada jugada es 100·e^(−3,2·pérdida) y la de la partida, la
   media entre la media normal y la armónica, que pesa más las jugadas malas. Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.

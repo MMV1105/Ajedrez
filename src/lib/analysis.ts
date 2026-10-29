@@ -28,7 +28,8 @@ export type AnalyzedMove = {
   evalAfter: PositionEval; // desde blancas
   epBefore: number; // puntos esperados del que mueve (0 a 1)
   epAfter: number;
-  epLoss: number;
+  epLoss: number; // pérdida que usa la precisión
+  clsLoss: number; // pérdida que usa la nota
   accuracy: number;
   cpLoss: number;
   cls: Classification;
@@ -106,10 +107,20 @@ const ACCURACY_K = 3.2;
 // error), contando las evaluaciones hasta ±15.
 const CP_SCALE = 800;
 const CP_CLAMP = 1500;
+// Para las notas los centipeones pesan la mitad (perder un peón = imprecisión, una pieza = error grave):
+// la precisión tiene que bajar con cada regalo, pero llamar error grave a cada peón perdido es pasarse.
+const CLS_CP_SCALE = 1600;
+// Si tras la jugada sigues ganando claramente (+3 o más), los centipeones perdidos restan como mucho esto
+// (un error en la precisión, una imprecisión en la nota): cuenta, pero no como regalar la partida.
+const WINNING = 300;
+const WINNING_CAP = { accuracy: 0.15, cls: 0.1 };
+// Jugadas de la línea del motor que se miran para decidir si una entrega de material es un sacrificio de verdad.
+const SACRIFICE_PLIES = 4;
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
   prevLoss?: number; // puntos esperados que acaba de perder el rival con su jugada anterior
+  prevTo?: string; // casilla de destino de la jugada anterior del rival (para reconocer las recapturas)
 };
 
 export function judgeMove(move: Move, before: PositionEval, after: PositionEval, ctx: MoveContext = {}) {
@@ -122,44 +133,62 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const cpLoss = Math.max(0, clampCp(cpBefore) - clampCp(cpAfter));
   const bigCpLoss = Math.max(0, Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpBefore)) - Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpAfter)));
   const epDrop = Math.max(0, epBefore - epAfter);
-  const epLoss = Math.max(epDrop, bigCpLoss / CP_SCALE);
+  const winning = cpAfter >= WINNING;
+  const epLoss = Math.max(epDrop, Math.min(bigCpLoss / CP_SCALE, winning ? WINNING_CAP.accuracy : Infinity));
   const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
+  const clsLoss = Math.max(epDrop, Math.min(bigCpLoss / CLS_CP_SCALE, winning ? WINNING_CAP.cls : Infinity));
   const uci = move.from + move.to + (move.promotion ?? '');
-  const best = uci === before.best || (epLoss < 0.001 && cpLoss <= 5);
+  const best = uci === before.best || (clsLoss < 0.001 && cpLoss <= 5);
 
-  // Brillante: casi la mejor, entrega al menos 2 puntos de material (tras la mejor respuesta del rival)
-  // y no deja peor al que la juega. No cuenta si ya estaba todo ganado.
-  const sacrifice = () => {
-    if (move.piece === 'p' || !after.best) return false;
+  // Brillante: casi la mejor jugada que entrega al menos 2 puntos de material: siguiendo la línea del motor,
+  // dos jugadas después sigues con menos (si lo recuperas antes, es un cambio, no un sacrificio), o la línea
+  // acaba en tu mate. Además la posición no queda peor y, salvo que sea un sacrificio para dar mate, no estaba
+  // ya ganada.
+  const sacrifice = (): 'mate' | 'material' | null => {
+    if (move.piece === 'p' || after.pv.length < 2) return null;
     try {
-      const reply = new Chess(move.after);
-      reply.move({ from: after.best.slice(0, 2), to: after.best.slice(2, 4), promotion: after.best[4] });
-      return materialFor(reply.fen(), color) - materialFor(move.before, color) <= -2;
+      const line = new Chess(move.after);
+      const down = () => materialFor(line.fen(), color) - materialFor(move.before, color) <= -2;
+      const u0 = after.pv[0];
+      line.move({ from: u0.slice(0, 2), to: u0.slice(2, 4), promotion: u0[4] });
+      if (!down()) return null;
+      for (const u of after.pv.slice(1, SACRIFICE_PLIES)) {
+        line.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+        if (line.isCheckmate()) return line.turn() !== color ? 'mate' : null;
+      }
+      return after.pv.length >= SACRIFICE_PLIES && down() ? 'material' : null;
     } catch {
-      return false; // jugada del motor no aplicable
+      return null; // línea del motor no aplicable
     }
   };
+  const brilliant = () => {
+    if (clsLoss > LIMITS.excelente || epAfter < 0.45) return false;
+    const sac = sacrifice();
+    return sac === 'mate' || (sac === 'material' && cpBefore < 500);
+  };
+  const recapture = !!move.captured && move.to === ctx.prevTo;
 
   let cls: Classification;
-  if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
-  else if (epLoss <= LIMITS.excelente && epAfter >= 0.5 && epBefore < 0.97 && sacrifice()) cls = 'brillante';
+  if (ctx.inBook && clsLoss <= LIMITS.buena) cls = 'teoria';
+  else if (brilliant()) cls = 'brillante';
   else if (best) {
-    // Gran jugada: la única buena. La segunda opción perdía al menos 0.15 y esta salva o mantiene la partida.
+    // Gran jugada: la única buena (la segunda perdía al menos 0.15), que salva o mantiene la partida.
+    // Recuperar la pieza que te acaban de comer no cuenta: es obvio.
     const second = before.second === null ? null : expectedPoints(sign * before.second);
-    cls = second !== null && epBefore - second >= 0.15 && epAfter >= 0.4 ? 'gran' : 'mejor';
-  } else if (epLoss <= LIMITS.excelente) cls = 'excelente';
-  else if (epLoss <= LIMITS.buena) cls = 'buena';
-  else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
+    cls = second !== null && epBefore - second >= 0.15 && epAfter >= 0.4 && !recapture ? 'gran' : 'mejor';
+  } else if (clsLoss <= LIMITS.excelente) cls = 'excelente';
+  else if (clsLoss <= LIMITS.buena) cls = 'buena';
+  else if (clsLoss <= LIMITS.imprecision) cls = 'imprecision';
   else {
     // Ocasión fallada: el rival acababa de equivocarse y devuelves lo ganado, sin quedar peor que antes de su error.
     const prev = ctx.prevLoss ?? 0;
     const missed = prev > LIMITS.imprecision && epAfter >= epBefore - prev - 0.05;
-    cls = missed ? 'fallo' : epLoss <= LIMITS.error ? 'error' : 'grave';
+    cls = missed ? 'fallo' : clsLoss <= LIMITS.error ? 'error' : 'grave';
   }
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
   const pressure = !decided && after.goodMoves === 1 && new Chess(move.after).moves().length > 1;
-  return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
+  return { epBefore, epAfter, epLoss, clsLoss, cpLoss, accuracy, cls, pressure };
 }
 
 // Precisión de la partida: media entre la media normal y la armónica, que pesa más las jugadas malas
@@ -198,7 +227,7 @@ export async function analyzeGame(
     const uci = move.from + move.to + (move.promotion ?? '');
     // La teoría solo cuenta mientras la partida no ha salido del libro.
     inTheory = inTheory && bookMoves(book!, move.before).some((m) => m.uci === uci);
-    const judged = judgeMove(move, evals[i], evals[i + 1], { inBook: inTheory, prevLoss: moves[i - 1]?.epLoss });
+    const judged = judgeMove(move, evals[i], evals[i + 1], { inBook: inTheory, prevLoss: moves[i - 1]?.clsLoss, prevTo: history[i - 1]?.to });
     moves.push({ move, fenBefore: move.before, fenAfter: move.after, color: move.color, evalBefore: evals[i], evalAfter: evals[i + 1], ...judged });
   });
   const stats = (c: 'w' | 'b') => {
