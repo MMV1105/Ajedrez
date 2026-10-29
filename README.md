@@ -28,7 +28,11 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   desvía 4,6 puntos de media de la suya en 99 partidas (Stockfish 19 a profundidad 14; 3 de cada 4 a 5 puntos o menos). Brillante: la mejor jugada dejando una pieza
   para que la coman (2 puntos netos o más) sin estar perdido ni ganando ya de +6; gran jugada: la única buena (la segunda
   pierde ≥ 0,12 de EP real), sin contar recapturas; ocasión fallada: devolver lo que el rival regaló con un error, o dejar
-  escapar un mate forzado sin perder la posición ganadora (cuenta como perder un peón). Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
+  escapar un mate forzado sin perder la posición ganadora (cuenta como perder un peón). Mantener un mate a favor (aunque tarde más) o seguir
+  recibiendo un mate que ya era inevitable cuenta como la mejor. También dice qué apertura jugó blancas y qué defensa
+  negras (y el nombre que le da chess.com), en qué jugada se salió de la teoría y cómo quedó la posición, y una
+  estimación del Elo al que corresponde la precisión de cada uno (curva sacada de 13.500 precisiones públicas de
+  chess.com de 0 a 3000 de Elo; con una sola partida es muy orientativa). Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
 - **Aperturas guiadas**: en tu turno, la mejor jugada con su porqué (o las 3 mejores con los centipeones que pierde

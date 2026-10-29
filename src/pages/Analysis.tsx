@@ -7,7 +7,8 @@ import MoveList from '../components/MoveList';
 import AnimatedNumber from '../components/AnimatedNumber';
 import Icon from '../components/Icon';
 import { Engine } from '../lib/engine';
-import { loadBook } from '../lib/openings';
+import { eloFromAccuracy, timeClassOf } from '../lib/elo';
+import { loadBook, openingSummary, type Book } from '../lib/openings';
 import { analyzeGame, CLASS_INFO, formatEval, playerAccuracy, type AnalyzedMove, type Classification, type GameAnalysis } from '../lib/analysis';
 import { PHASES, phaseOf } from '../lib/profile';
 import { fetchArchives, fetchMonth, monthLabel, resultFor, type ChessComGame } from '../lib/chesscom';
@@ -48,6 +49,7 @@ export default function Analysis() {
   const [remote, setRemote] = useState(false);
   // Precisión que da chess.com a la partida, para comparar.
   const [chesscomAcc, setChesscomAcc] = useState<{ w: number; b: number } | null>(null);
+  const [book, setBook] = useState<Book | null>(null);
 
   useEffect(() => {
     const engine = (engineRef.current = new Engine());
@@ -130,6 +132,7 @@ export default function Analysis() {
     setFlip((!!me && header(p, 'Black').toLowerCase() === me) || header(p, 'Black') === 'Tú');
     setProgress([0, 1]);
     const book = await loadBook();
+    setBook(book);
     const res = await analyzeGame(engineRef.current!, p, d, (a, b, ms) => {
       if (id !== runId.current) return;
       setProgress([a, b]);
@@ -178,6 +181,11 @@ export default function Analysis() {
       return { phase: p, w: of('w'), b: of('b') };
     });
   }, [analysis]);
+
+  // Apertura jugada: nombre del libro, la de blancas y la defensa de negras, y dónde se sale de la teoría.
+  const opening = useMemo(() => (analysis && book ? openingSummary(book, analysis.moves.map((m) => m.move)) : null), [analysis, book]);
+  // chess.com pone su propio nombre en el PGN (ECOUrl).
+  const chesscomOpening = pgn ? (/\[ECOUrl "[^"]*\/openings\/([^"]+)"\]/.exec(pgn)?.[1].replace(/-/g, ' ') ?? null) : null;
 
   const startFen = useMemo(() => {
     if (!pgn) return new Chess().fen();
@@ -296,6 +304,9 @@ export default function Analysis() {
                       </span>
                       <span className="small">precisión</span>
                       {chesscomAcc && <span className="small muted">chess.com {chesscomAcc[c].toFixed(1)}</span>}
+                      <span className="small muted" title="Elo al que suele corresponder esta precisión. Con una sola partida es muy orientativo.">
+                        juego de ~{eloFromAccuracy(chesscomAcc ? chesscomAcc[c] : analysis.accuracy[c], timeClassOf(header(pgn, 'TimeControl')))} Elo
+                      </span>
                       <span className="small pressure-line" title="Jugadas que dejan al rival con una sola respuesta buena">
                         presión {analysis.pressure[c].toFixed(0)} %
                       </span>
@@ -314,6 +325,39 @@ export default function Analysis() {
                     ))}
                   </tbody>
                 </table>
+
+                {opening && (
+                  <div className="opening-box small">
+                    <p>
+                      <span className="muted">Blancas</span> <strong>{opening.opening ?? opening.name}</strong>
+                      {opening.defense && (
+                        <>
+                          {' · '}
+                          <span className="muted">negras</span> <strong>{opening.defense}</strong>
+                        </>
+                      )}
+                    </p>
+                    <p className="muted">
+                      {opening.name} ({opening.eco}){chesscomOpening && <> · chess.com: {chesscomOpening}</>}
+                    </p>
+                    {opening.outOfBook < analysis.moves.length && (
+                      <p>
+                        <button className="link-btn" onClick={() => go(opening.outOfBook + 1)}>
+                          Fuera de teoría con {Math.floor(opening.outOfBook / 2) + 1}
+                          {opening.outOfBook % 2 ? '…' : '.'}
+                          {analysis.moves[opening.outOfBook].move.san}
+                        </button>
+                        {' · '}
+                        {(() => {
+                          const e = analysis.evals[opening.outOfBook];
+                          const cp = e.mate !== null ? (e.mate > 0 ? 1000 : -1000) : e.cp;
+                          const who = cp > 60 ? 'blancas salen mejor' : cp < -60 ? 'negras salen mejor' : 'posición igualada';
+                          return `${who} (${formatEval(e)})`;
+                        })()}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <EvalGraph analysis={analysis} ply={ply} onSelect={go} />
 

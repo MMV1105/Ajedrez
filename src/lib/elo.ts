@@ -64,3 +64,20 @@ export function classOf(baseSec: number, incSec: number): RatingClass {
   if (total < 600) return 'blitz';
   return 'rapid';
 }
+
+// Elo al que corresponde una precisión (al estilo de chess.com). Curva ajustada con 13.500 precisiones públicas de
+// chess.com de jugadores de 0 a 3000: precisión media ≈ 63,9 + 7,2·x + 0,374·x² (x = Elo/1000), unos 8 puntos menos
+// en bala. Se invierte para pasar de precisión a Elo. Con una sola partida es muy orientativo (la mitad de las veces
+// falla por más de ±500); con 20 partidas, por más de ±300.
+export function timeClassOf(timeControl: string) {
+  const base = Number(/^(\d+)/.exec(timeControl)?.[1] ?? NaN);
+  const inc = Number(/\+(\d+)/.exec(timeControl)?.[1] ?? 0);
+  if (!Number.isFinite(base) || timeControl.includes('/')) return 'rapid';
+  const t = base + 40 * inc;
+  return t < 180 ? 'bullet' : t < 600 ? 'blitz' : 'rapid';
+}
+export function eloFromAccuracy(accuracy: number, timeClass = 'rapid') {
+  const c = 63.9 + (timeClass === 'bullet' ? -7.9 : 0) - accuracy;
+  const x = (-7.2 + Math.sqrt(Math.max(0, 7.2 * 7.2 - 4 * 0.374 * c))) / (2 * 0.374);
+  return Math.round(Math.min(2900, Math.max(100, x * 1000)) / 50) * 50;
+}

@@ -1,5 +1,6 @@
 import { Chess } from 'chess.js';
 import { evalToCp, isMistake, playerAccuracy, winPct, type Classification, type GameAnalysis } from './analysis';
+import { eloFromAccuracy } from './elo';
 import type { BotStyle } from './style';
 
 export type Phase = 'apertura' | 'medio juego' | 'final';
@@ -113,6 +114,7 @@ export type Profile = {
   record: { win: number; draw: number; loss: number };
   accuracy: number;
   oppAccuracy: number;
+  elo: number; // Elo que corresponde a la precisión media (orientativo)
   phases: { phase: Phase; accuracy: number | null }[];
   traits: Trait[];
   openings: { name: string; color: 'w' | 'b'; games: number; score: number; accuracy: number }[];
@@ -131,6 +133,8 @@ export function buildProfile(gs: GameSummary[]): Profile {
   for (const g of gs) record[g.result]++;
   const accuracy = avg(gs.map((g) => g.accuracy));
   const oppAccuracy = avg(gs.map((g) => g.oppAccuracy));
+  // Elo estimado: media de lo que da cada partida según su ritmo (contra los bots, como rápidas).
+  const elo = Math.round(avg(gs.map((g) => eloFromAccuracy(g.accuracy, g.timeClass))) / 50) * 50;
 
   const phases = PHASES.map((p) => {
     const sum = gs.reduce((s, g) => s + g.phase[p][0], 0);
@@ -216,7 +220,7 @@ export function buildProfile(gs: GameSummary[]): Profile {
     risk: clamp(round10(graves * 30), 0, 80),
   };
 
-  return { games: n, record, accuracy, oppAccuracy, phases, traits, openings, strengths, weaknesses, mirror };
+  return { games: n, record, accuracy, oppAccuracy, elo, phases, traits, openings, strengths, weaknesses, mirror };
 }
 
 function art(p: Phase) {
