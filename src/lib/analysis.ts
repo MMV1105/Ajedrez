@@ -28,8 +28,7 @@ export type AnalyzedMove = {
   evalAfter: PositionEval; // desde blancas
   epBefore: number; // puntos esperados del que mueve (0 a 1)
   epAfter: number;
-  epLoss: number; // pérdida que usa la precisión
-  clsLoss: number; // pérdida que usa la nota
+  epLoss: number; // ΔEP
   accuracy: number;
   cpLoss: number;
   cls: Classification;
@@ -97,30 +96,19 @@ export function expectedPoints(cp: number) {
   return 1 / (1 + Math.pow(10, -cp / 400));
 }
 
-// Pérdida máxima para cada nota; por encima de la última, error grave.
+// Pérdida máxima de puntos esperados (ΔEP) para cada nota; por encima de la última, error grave.
 const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
-// Pendiente de la precisión por jugada: 100·e^(−k·pérdida). Con 3.2: perder 0.05 → 85, 0.1 → 73, 0.2 → 53.
+// Precisión de cada jugada: 100·e^(−k·ΔEP) con k = 3,2 (0,02 → 94, 0,05 → 85, 0,10 → 72, 0,20 → 52).
 const ACCURACY_K = 3.2;
-// Los puntos esperados apenas cambian cuando ya vas muy perdido (de −8 a −12 casi no se mueven), así que
-// regalar material en una partida perdida no contaría, y lo mismo con los errores del que va ganando. Por eso
-// la pérdida es también, como mínimo, los centipeones perdidos / CP_SCALE (800: perder un peón son 0,125, un
-// error), contando las evaluaciones hasta ±15.
-const CP_SCALE = 800;
-const CP_CLAMP = 1500;
-// Para las notas los centipeones pesan la mitad (perder un peón = imprecisión, una pieza = error grave):
-// la precisión tiene que bajar con cada regalo, pero llamar error grave a cada peón perdido es pasarse.
-const CLS_CP_SCALE = 1600;
-// Si tras la jugada sigues ganando claramente (+3 o más), los centipeones perdidos restan como mucho esto
-// (un error en la precisión, una imprecisión en la nota): cuenta, pero no como regalar la partida.
-const WINNING = 300;
-const WINNING_CAP = { accuracy: 0.15, cls: 0.1 };
-// Jugadas de la línea del motor que se miran para decidir si una entrega de material es un sacrificio de verdad.
+// Gran jugada: la segunda mejor pierde al menos esto.
+const GREAT_GAP = 0.15;
+// Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
+const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
-  prevLoss?: number; // puntos esperados que acaba de perder el rival con su jugada anterior
-  prevTo?: string; // casilla de destino de la jugada anterior del rival (para reconocer las recapturas)
+  prevLoss?: number; // ΔEP de la jugada anterior del rival
 };
 
 export function judgeMove(move: Move, before: PositionEval, after: PositionEval, ctx: MoveContext = {}) {
@@ -128,76 +116,65 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const sign = color === 'w' ? 1 : -1;
   const cpBefore = sign * evalToCp(before);
   const cpAfter = sign * evalToCp(after);
-  const epBefore = expectedPoints(cpBefore);
-  const epAfter = expectedPoints(cpAfter);
+  const epBefore = expectedPoints(cpBefore); // EP de la mejor jugada
+  const epAfter = expectedPoints(cpAfter); // EP tras tu jugada
+  const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
   const cpLoss = Math.max(0, clampCp(cpBefore) - clampCp(cpAfter));
-  const bigCpLoss = Math.max(0, Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpBefore)) - Math.max(-CP_CLAMP, Math.min(CP_CLAMP, cpAfter)));
-  const epDrop = Math.max(0, epBefore - epAfter);
-  const winning = cpAfter >= WINNING;
-  const epLoss = Math.max(epDrop, Math.min(bigCpLoss / CP_SCALE, winning ? WINNING_CAP.accuracy : Infinity));
   const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
-  const clsLoss = Math.max(epDrop, Math.min(bigCpLoss / CLS_CP_SCALE, winning ? WINNING_CAP.cls : Infinity));
   const uci = move.from + move.to + (move.promotion ?? '');
-  const best = uci === before.best || (clsLoss < 0.001 && cpLoss <= 5);
+  const best = uci === before.best || epLoss === 0;
 
-  // Brillante: casi la mejor jugada que entrega al menos 2 puntos de material: siguiendo la línea del motor,
-  // dos jugadas después sigues con menos (si lo recuperas antes, es un cambio, no un sacrificio), o la línea
-  // acaba en tu mate. Además la posición no queda peor y, salvo que sea un sacrificio para dar mate, no estaba
-  // ya ganada.
-  const sacrifice = (): 'mate' | 'material' | null => {
-    if (move.piece === 'p' || after.pv.length < 2) return null;
+  // Sacrificio: tras la línea del motor (o al acabar en tu mate) has entregado al menos 2 puntos netos de material.
+  const sacrifice = () => {
+    if (!after.pv.length) return false;
     try {
       const line = new Chess(move.after);
-      const down = () => materialFor(line.fen(), color) - materialFor(move.before, color) <= -2;
-      const u0 = after.pv[0];
-      line.move({ from: u0.slice(0, 2), to: u0.slice(2, 4), promotion: u0[4] });
-      if (!down()) return null;
-      for (const u of after.pv.slice(1, SACRIFICE_PLIES)) {
+      for (const u of after.pv.slice(0, SACRIFICE_PLIES)) {
         line.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
-        if (line.isCheckmate()) return line.turn() !== color ? 'mate' : null;
+        if (line.isCheckmate()) break;
       }
-      return after.pv.length >= SACRIFICE_PLIES && down() ? 'material' : null;
+      const mated = line.isCheckmate() && line.turn() !== color;
+      const net = materialFor(line.fen(), color) - materialFor(move.before, color);
+      if (mated) {
+        // Mate tras entregar material: se mira lo que el rival llegó a comer antes del mate.
+        const reply = new Chess(move.after);
+        const u = after.pv[0];
+        reply.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+        return materialFor(reply.fen(), color) - materialFor(move.before, color) <= -SACRIFICE_POINTS;
+      }
+      return after.pv.length >= SACRIFICE_PLIES && net <= -SACRIFICE_POINTS;
     } catch {
-      return null; // línea del motor no aplicable
+      return false; // línea del motor no aplicable
     }
   };
-  const brilliant = () => {
-    if (clsLoss > LIMITS.excelente || epAfter < 0.45) return false;
-    const sac = sacrifice();
-    return sac === 'mate' || (sac === 'material' && cpBefore < 500);
-  };
-  const recapture = !!move.captured && move.to === ctx.prevTo;
 
   let cls: Classification;
-  if (ctx.inBook && clsLoss <= LIMITS.buena) cls = 'teoria';
-  else if (brilliant()) cls = 'brillante';
+  if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
+  // Brillante: ΔEP ≤ 0,02, entrega material y la posición no empeora (la evaluación no baja más de 20 cp,
+  // el equivalente de "excelente"; si no, en una partida ya perdida colgar piezas saldría brillante).
+  else if (epLoss <= LIMITS.excelente && cpBefore - cpAfter <= 20 && sacrifice()) cls = 'brillante';
   else if (best) {
-    // Gran jugada: la única buena (la segunda perdía al menos 0.15), que salva o mantiene la partida.
-    // Recuperar la pieza que te acaban de comer no cuenta: es obvio.
+    // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15.
     const second = before.second === null ? null : expectedPoints(sign * before.second);
-    cls = second !== null && epBefore - second >= 0.15 && epAfter >= 0.4 && !recapture ? 'gran' : 'mejor';
-  } else if (clsLoss <= LIMITS.excelente) cls = 'excelente';
-  else if (clsLoss <= LIMITS.buena) cls = 'buena';
-  else if (clsLoss <= LIMITS.imprecision) cls = 'imprecision';
+    cls = second !== null && epBefore - second >= GREAT_GAP ? 'gran' : 'mejor';
+  } else if (epLoss <= LIMITS.excelente) cls = 'excelente';
+  else if (epLoss <= LIMITS.buena) cls = 'buena';
+  else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
   else {
-    // Ocasión fallada: el rival acababa de equivocarse y devuelves lo ganado, sin quedar peor que antes de su error.
+    // Ocasión fallada: el rival acababa de cometer un error grave y no lo castigas: devuelves lo que te había regalado.
     const prev = ctx.prevLoss ?? 0;
-    const missed = prev > LIMITS.imprecision && epAfter >= epBefore - prev - 0.05;
-    cls = missed ? 'fallo' : clsLoss <= LIMITS.error ? 'error' : 'grave';
+    const missed = prev > LIMITS.error && epAfter >= epBefore - prev - 0.05;
+    cls = missed ? 'fallo' : epLoss <= LIMITS.error ? 'error' : 'grave';
   }
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
   const pressure = !decided && after.goodMoves === 1 && new Chess(move.after).moves().length > 1;
-  return { epBefore, epAfter, epLoss, clsLoss, cpLoss, accuracy, cls, pressure };
+  return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
 }
 
-// Precisión de la partida: media entre la media normal y la armónica, que pesa más las jugadas malas
-// (con la media normal, unos pocos errores graves entre muchas jugadas fáciles apenas bajan la nota).
+// Precisión de la partida: media aritmética de la precisión de cada jugada.
 export function playerAccuracy(xs: number[]) {
-  if (!xs.length) return 0;
-  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
-  const harmonic = xs.length / xs.reduce((a, b) => a + 1 / Math.max(b, 1), 0);
-  return (mean + harmonic) / 2;
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 }
 
 export const isMistake = (c: Classification) => c === 'error' || c === 'fallo' || c === 'grave';
@@ -227,7 +204,7 @@ export async function analyzeGame(
     const uci = move.from + move.to + (move.promotion ?? '');
     // La teoría solo cuenta mientras la partida no ha salido del libro.
     inTheory = inTheory && bookMoves(book!, move.before).some((m) => m.uci === uci);
-    const judged = judgeMove(move, evals[i], evals[i + 1], { inBook: inTheory, prevLoss: moves[i - 1]?.clsLoss, prevTo: history[i - 1]?.to });
+    const judged = judgeMove(move, evals[i], evals[i + 1], { inBook: inTheory, prevLoss: moves[i - 1]?.epLoss });
     moves.push({ move, fenBefore: move.before, fenAfter: move.after, color: move.color, evalBefore: evals[i], evalAfter: evals[i + 1], ...judged });
   });
   const stats = (c: 'w' | 'b') => {
