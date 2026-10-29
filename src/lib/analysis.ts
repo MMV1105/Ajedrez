@@ -101,22 +101,34 @@ export function expectedPoints(cp: number) {
 
 // Pérdida máxima de puntos esperados (ΔEP) para cada nota; por encima de la última, error grave.
 const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
-// Precisión de cada jugada: 100·e^(−k·ΔEP). k = 23,45 es el que reproduce la precisión de chess.com en las dos
-// partidas de calibración (chess.com 70,5 / 59,9 y 80,7 / 74,3; aquí 69,9 / 60,9 y 81,8 / 72,4).
-// 20 cp perdidos → 78, 1 peón → 29.
-const ACCURACY_K = 23.45;
-// Gran jugada: la segunda mejor pierde al menos esto.
-const GREAT_GAP = 0.15;
+// Precisión de cada jugada: 100·e^(−k·pérdida), con la pérdida = 25 % la ΔEP anclada en 0 y 75 % la ΔEP real
+// (la que pierdes según cómo va la partida). k = 14 y ese reparto son los que mejor reproducen a la vez la
+// precisión de chess.com en 99 partidas reales (se desvía 5,2 de media; antes 8,3) y la de Chessigma en otras 61 (4,6; antes 6,8).
+// Igualados: 20 cp perdidos → 86, 1 peón → 48, 2 peones → 24.
+const ACCURACY_K = 14;
+const ANCHOR_WEIGHT = 0.25;
+// Gran jugada: la segunda mejor pierde al menos esto (ajustado con 4.200 jugadas de Chessigma).
+const GREAT_GAP = 0.12;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
 const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
 const BRILLIANT_FLOOR = -200;
+const BRILLIANT_CEILING = 600; // ya ganando de +6 o más, sacrificar no tiene mérito
 // Mate forzado que se deja escapar sin perder la posición ganadora (sigues a +3 o más): ocasión fallada,
 // y la precisión se calcula como si perdieras un peón.
 const MISSED_MATE_WINNING = 300;
 const MISSED_MATE_CPL = 100;
 // ΔEP anclado en 0: 0,5 − EP(−CPL). Con la escala de 1100, los límites equivalen a unos 38, 96, 194 y 405 cp perdidos.
 export const anchoredLoss = (cpl: number) => 0.5 - expectedPoints(-cpl);
+// Nota en posiciones decididas: si sigues ganando (o perdiendo) tras la jugada, lo perdido se divide por
+// 1 + 0,2 por cada peón de ventaja por encima de +2,5 (hasta +10: como mucho entre 2,5). Un error se sigue
+// marcando, pero perder 1,5 peones a +8 no es lo mismo que a 0. Igualados no cambia nada. Para la nota,
+// un mate en contra (o un mate a favor que se escapa) vale como mucho 15 peones. Con esto Jaque coincide con
+// Chessigma en el 93 % de las jugadas (bien / imprecisión / error / grave), frente al 89 % sin ello.
+const DECIDED_FROM = 250;
+const DECIDED_PER_PAWN = 0.2;
+const DECIDED_CAP = 1000;
+const MATE_VALUE = 1500;
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
@@ -144,7 +156,16 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const cpLoss = missedMate ? MISSED_MATE_CPL : Math.max(0, cpBefore - cpAfter);
   const best = uci === before.best || cpLoss === 0;
   const epLoss = best ? 0 : anchoredLoss(cpLoss); // ΔEP como si la partida estuviera igualada
-  const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
+  // Pérdida para la nota (la precisión usa la de arriba, sin rebajas).
+  const matedAfter = after.mate !== null && cpAfter < 0 && !(before.mate !== null && cpBefore < 0);
+  const cpBeforeG = hadMate && !keepsMate ? Math.max(MATE_VALUE, cpAfter) : cpBefore;
+  const cpAfterG = matedAfter ? Math.min(-MATE_VALUE, cpBefore) : cpAfter;
+  const gradeCpl = missedMate ? cpLoss : Math.max(0, Math.min(cpLoss, cpBeforeG - cpAfterG));
+  const still = cpBefore * cpAfter > 0 ? Math.min(Math.abs(cpBefore), Math.abs(cpAfter), DECIDED_CAP) : 0;
+  const tolerance = 1 + (DECIDED_PER_PAWN * Math.max(0, still - DECIDED_FROM)) / 100;
+  const gradeLoss = best ? 0 : anchoredLoss(gradeCpl / tolerance);
+  const realLoss = best ? 0 : Math.max(0, epBefore - epAfter);
+  const accuracy = 100 * Math.exp(-ACCURACY_K * (ANCHOR_WEIGHT * epLoss + (1 - ANCHOR_WEIGHT) * realLoss));
 
   // Sacrificio: dejas una pieza para que la coman (tras su respuesta pierdes 2 puntos netos o más y no recuperas
   // en esa misma casilla) o, tras la línea del motor (o al acabar en tu mate), has entregado 2 puntos netos o más.
@@ -171,22 +192,23 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   };
 
   let cls: Classification;
-  if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
+  if (ctx.inBook && gradeLoss <= LIMITS.buena) cls = 'teoria';
   else if (missedMate) cls = 'fallo';
-  // Brillante: ΔEP ≤ 0,02 (la posición no empeora) y entrega material; no cuenta si ya estás perdido (−2 o peor).
-  else if (epLoss <= LIMITS.excelente && cpAfter > BRILLIANT_FLOOR && sacrifice()) cls = 'brillante';
+  // Brillante: la mejor jugada (o sin pérdida) y entrega material; no cuenta si ya estás perdido (−2 o peor)
+  // ni si ya ganabas de sobra (+6 o más).
+  else if (best && cpAfter > BRILLIANT_FLOOR && cpBefore < BRILLIANT_CEILING && sacrifice()) cls = 'brillante';
   else if (best) {
-    // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15 (con la evaluación real:
+    // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,12 (con la evaluación real:
     // es la única jugada que mantiene el resultado).
     const second = before.second === null ? null : expectedPoints(sign * before.second);
     // Recuperar la pieza que te acaban de comer no cuenta: es obvio aunque sea la única.
     const recapture = !!move.captured && move.to === ctx.prevCapture;
     cls = second !== null && epBefore - second >= GREAT_GAP && !recapture ? 'gran' : 'mejor';
   } else {
-    if (epLoss <= LIMITS.excelente) cls = 'excelente';
-    else if (epLoss <= LIMITS.buena) cls = 'buena';
-    else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
-    else if (epLoss <= LIMITS.error) cls = 'error';
+    if (gradeLoss <= LIMITS.excelente) cls = 'excelente';
+    else if (gradeLoss <= LIMITS.buena) cls = 'buena';
+    else if (gradeLoss <= LIMITS.imprecision) cls = 'imprecision';
+    else if (gradeLoss <= LIMITS.error) cls = 'error';
     else cls = 'grave';
     // Ocasión fallada: el rival acababa de cometer un error (o algo peor) y no lo castigas: devuelves lo que te había regalado.
     const gift = ctx.prevCpLoss ?? 0;
@@ -199,9 +221,10 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
 }
 
-// Precisión de la partida: media aritmética de la precisión de cada jugada.
+// Precisión de la partida: media de las raíces de la precisión de cada jugada, al cuadrado. Pesa más los
+// fallos que la media aritmética (un 0 entre dieciocho 100 da 89, no 95), como chess.com.
 export function playerAccuracy(xs: number[]) {
-  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+  return xs.length ? (xs.reduce((a, b) => a + Math.sqrt(b), 0) / xs.length) ** 2 : 0;
 }
 
 export const isMistake = (c: Classification) => c === 'error' || c === 'fallo' || c === 'grave';

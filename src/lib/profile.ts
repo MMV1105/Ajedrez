@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import { evalToCp, isMistake, winPct, type Classification, type GameAnalysis } from './analysis';
+import { evalToCp, isMistake, playerAccuracy, winPct, type Classification, type GameAnalysis } from './analysis';
 import type { BotStyle } from './style';
 
 export type Phase = 'apertura' | 'medio juego' | 'final';
@@ -73,7 +73,7 @@ export function summarizeGame(
   a.moves.forEach((m, i) => {
     if (m.color !== me) return;
     const p = phaseOf(m.fenBefore, i);
-    phase[p][0] += m.accuracy;
+    phase[p][0] += Math.sqrt(m.accuracy); // como playerAccuracy: media de raíces, al cuadrado
     phase[p][1] += 1;
     phase[p][2] += 1 / Math.max(m.accuracy, 1);
   });
@@ -87,7 +87,7 @@ export function summarizeGame(
   }
   const sign = me === 'w' ? 1 : -1;
   const hadWinning = a.evals.some((e, i) => i > 10 && winPct(sign * evalToCp(e)) >= 85);
-  const acc = (xs: typeof mine) => (xs.length ? xs.reduce((s, m) => s + m.accuracy, 0) / xs.length : 0);
+  const acc = (xs: typeof mine) => playerAccuracy(xs.map((m) => m.accuracy));
   return {
     ...meta,
     opening: openingName(pgn),
@@ -135,8 +135,8 @@ export function buildProfile(gs: GameSummary[]): Profile {
   const phases = PHASES.map((p) => {
     const sum = gs.reduce((s, g) => s + g.phase[p][0], 0);
     const cnt = gs.reduce((s, g) => s + g.phase[p][1], 0);
-    // Media aritmética, como la precisión de cada partida.
-    return { phase: p, accuracy: cnt >= 6 ? sum / cnt : null };
+    // Igual que la precisión de cada partida: media de raíces, al cuadrado.
+    return { phase: p, accuracy: cnt >= 6 ? (sum / cnt) ** 2 : null };
   });
 
   const aggr = avg(gs.map((g) => g.aggressive));
