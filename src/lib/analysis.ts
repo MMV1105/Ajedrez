@@ -108,6 +108,10 @@ const SACRIFICE_PLIES = 4;
 const CPL_LIMITS = { excelente: 20, buena: 45, imprecision: 90, error: 180 };
 // Precisión por CPL: 100·e^(−k·CPL), con k tal que en igualdad da lo mismo que la de ΔEP (3,2 · ln 10 / 1600 ≈ 0,0046).
 const CPL_ACCURACY_K = (ACCURACY_K * Math.LN10) / 1600;
+// Mate forzado que se deja escapar sin perder la posición ganadora (sigues a +3 o más): ocasión fallada,
+// y la precisión se calcula como si perdieras un peón.
+const MISSED_MATE_WINNING = 300;
+const MISSED_MATE_CPL = 100;
 const SEVERITY: Classification[] = ['excelente', 'buena', 'imprecision', 'error', 'grave'];
 const grade = (loss: number, limits: typeof LIMITS) =>
   loss <= limits.excelente ? 'excelente' : loss <= limits.buena ? 'buena' : loss <= limits.imprecision ? 'imprecision' : loss <= limits.error ? 'error' : 'grave';
@@ -124,9 +128,13 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const cpAfter = sign * evalToCp(after);
   const epBefore = expectedPoints(cpBefore); // EP de la mejor jugada
   const epAfter = expectedPoints(cpAfter); // EP tras tu jugada
-  const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
-  const cpLoss = Math.max(0, cpBefore - cpAfter); // CPL, sin recortar: simplificar también cuenta si no es lo óptimo
   const uci = move.from + move.to + (move.promotion ?? '');
+  const hadMate = before.mate !== null && sign * before.mate > 0;
+  const keepsMate = after.mate !== null && cpAfter > 0; // sigue habiendo mate a favor (o ya lo has dado)
+  const missedMate = hadMate && !keepsMate && uci !== before.best && cpAfter >= MISSED_MATE_WINNING;
+  const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
+  // CPL, sin recortar: simplificar también cuenta si no es lo óptimo.
+  const cpLoss = missedMate ? MISSED_MATE_CPL : Math.max(0, cpBefore - cpAfter);
   const best = uci === before.best || cpLoss === 0;
   // Se mide de las dos formas y cuenta la peor: así se pierde ventaja igual vayas ganando, igualado o perdiendo.
   const accuracy = best ? 100 : Math.min(100 * Math.exp(-ACCURACY_K * epLoss), 100 * Math.exp(-CPL_ACCURACY_K * cpLoss));
@@ -157,6 +165,7 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
 
   let cls: Classification;
   if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
+  else if (missedMate) cls = 'fallo';
   // Brillante: ΔEP ≤ 0,02, entrega material y la posición no empeora (la evaluación no baja más de 20 cp,
   // el equivalente de "excelente"; si no, en una partida ya perdida colgar piezas saldría brillante).
   else if (epLoss <= LIMITS.excelente && cpBefore - cpAfter <= 20 && sacrifice()) cls = 'brillante';
@@ -189,7 +198,7 @@ export async function analyzeGame(
   engine: Engine,
   pgn: string,
   depth: number,
-  onProgress: (done: number, total: number) => void,
+  onProgress: (done: number, total: number, moves: AnalyzedMove[]) => void,
   isCancelled: () => boolean,
   book: Book | null = null,
 ): Promise<GameAnalysis | null> {
@@ -199,20 +208,23 @@ export async function analyzeGame(
   const startFen = history.length ? history[0].before : chess.fen();
   const fens = [startFen, ...history.map((m) => m.after)];
   const evals: PositionEval[] = [];
+  const moves: AnalyzedMove[] = [];
+  let inTheory = !!book && history.length > 0 && history[0].before === new Chess().fen();
+  // Cada jugada se valora en cuanto está evaluada la posición siguiente, para poder enseñarla mientras se analiza.
   for (let i = 0; i < fens.length; i++) {
     if (isCancelled()) return null;
     evals.push(await evalPosition(engine, fens[i], depth));
-    onProgress(i + 1, fens.length);
+    if (i > 0) {
+      const k = i - 1;
+      const move = history[k];
+      const uci = move.from + move.to + (move.promotion ?? '');
+      // La teoría solo cuenta mientras la partida no ha salido del libro.
+      inTheory = inTheory && bookMoves(book!, move.before).some((m) => m.uci === uci);
+      const judged = judgeMove(move, evals[k], evals[i], { inBook: inTheory, prevLoss: moves[k - 1]?.epLoss });
+      moves.push({ move, fenBefore: move.before, fenAfter: move.after, color: move.color, evalBefore: evals[k], evalAfter: evals[i], ...judged });
+    }
+    onProgress(i + 1, fens.length, moves);
   }
-  const moves: AnalyzedMove[] = [];
-  let inTheory = !!book && history.length > 0 && history[0].before === new Chess().fen();
-  history.forEach((move, i) => {
-    const uci = move.from + move.to + (move.promotion ?? '');
-    // La teoría solo cuenta mientras la partida no ha salido del libro.
-    inTheory = inTheory && bookMoves(book!, move.before).some((m) => m.uci === uci);
-    const judged = judgeMove(move, evals[i], evals[i + 1], { inBook: inTheory, prevLoss: moves[i - 1]?.epLoss });
-    moves.push({ move, fenBefore: move.before, fenAfter: move.after, color: move.color, evalBefore: evals[i], evalAfter: evals[i + 1], ...judged });
-  });
   const stats = (c: 'w' | 'b') => {
     const mine = moves.filter((m) => m.color === c);
     return {

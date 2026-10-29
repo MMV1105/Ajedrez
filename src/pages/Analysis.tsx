@@ -8,7 +8,8 @@ import AnimatedNumber from '../components/AnimatedNumber';
 import Icon from '../components/Icon';
 import { Engine } from '../lib/engine';
 import { loadBook } from '../lib/openings';
-import { analyzeGame, CLASS_INFO, formatEval, type Classification, type GameAnalysis } from '../lib/analysis';
+import { analyzeGame, CLASS_INFO, formatEval, playerAccuracy, type AnalyzedMove, type Classification, type GameAnalysis } from '../lib/analysis';
+import { PHASES, phaseOf } from '../lib/profile';
 import { fetchArchives, fetchMonth, monthLabel, resultFor, type ChessComGame } from '../lib/chesscom';
 import { takePendingPgn } from '../lib/nav';
 import { load, save } from '../lib/storage';
@@ -37,6 +38,8 @@ export default function Analysis() {
   const [depth, setDepth] = useState(() => load('analysisDepth', 14));
   const [progress, setProgress] = useState<[number, number] | null>(null);
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null);
+  // Última jugada ya valorada mientras se analiza, para ir moviendo el tablero.
+  const [live, setLive] = useState<AnalyzedMove | null>(null);
   const [ply, setPly] = useState(0);
   const [flip, setFlip] = useState(false);
 
@@ -121,14 +124,20 @@ export default function Analysis() {
     setError('');
     setPgn(p);
     setAnalysis(null);
+    setLive(null);
     setPly(0);
     const me = username.trim().toLowerCase();
-    setFlip(header(p, 'Black').toLowerCase() === me || header(p, 'Black') === 'Tú');
+    setFlip((!!me && header(p, 'Black').toLowerCase() === me) || header(p, 'Black') === 'Tú');
     setProgress([0, 1]);
     const book = await loadBook();
-    const res = await analyzeGame(engineRef.current!, p, d, (a, b) => id === runId.current && setProgress([a, b]), () => id !== runId.current, book);
+    const res = await analyzeGame(engineRef.current!, p, d, (a, b, ms) => {
+      if (id !== runId.current) return;
+      setProgress([a, b]);
+      setLive(ms[ms.length - 1] ?? null);
+    }, () => id !== runId.current, book);
     if (id !== runId.current || !res) return;
     setProgress(null);
+    setLive(null);
     setAnalysis(res);
   }
 
@@ -158,13 +167,37 @@ export default function Analysis() {
     return s;
   }, [analysis]);
 
+  // Precisión de cada bando en apertura, medio juego y final (media de sus jugadas en esa fase).
+  const phases = useMemo(() => {
+    const ms = analysis?.moves ?? [];
+    return PHASES.map((p) => {
+      const of = (c: 'w' | 'b') => {
+        const xs = ms.filter((m, i) => m.color === c && phaseOf(m.fenBefore, i) === p).map((m) => m.accuracy);
+        return xs.length ? playerAccuracy(xs) : null;
+      };
+      return { phase: p, w: of('w'), b: of('b') };
+    });
+  }, [analysis]);
+
+  const startFen = useMemo(() => {
+    if (!pgn) return new Chess().fen();
+    try {
+      const c = new Chess();
+      c.loadPgn(pgn);
+      return c.history({ verbose: true })[0]?.before ?? c.fen();
+    } catch {
+      return new Chess().fen();
+    }
+  }, [pgn]);
+
   const savedGames = load<SavedGame[]>('games', []);
 
   // --- Vista de análisis ---
   if (pgn) {
-    const current = analysis && ply > 0 ? analysis.moves[ply - 1] : null;
-    const fen = analysis ? (ply === 0 ? analysis.moves[0]?.fenBefore ?? new Chess().fen() : current!.fenAfter) : new Chess().fen();
-    const ev = analysis ? analysis.evals[ply] : null;
+    // Mientras se analiza, el tablero sigue la última jugada valorada.
+    const current = analysis ? (ply > 0 ? analysis.moves[ply - 1] : null) : live;
+    const fen = current ? current.fenAfter : startFen;
+    const ev = analysis ? analysis.evals[ply] : live ? live.evalAfter : null;
     const bestHere = analysis?.evals[ply]?.best;
     const arrows: [string, string, string][] = [];
     if (current && current.cls !== 'mejor' && current.cls !== 'gran' && current.cls !== 'brillante' && current.evalBefore.best) {
@@ -244,6 +277,11 @@ export default function Analysis() {
                 <div className="progress">
                   <div style={{ width: `${(progress[0] / progress[1]) * 100}%` }} />
                 </div>
+                {live && (
+                  <p className="small muted">
+                    {live.move.san}: {CLASS_INFO[live.cls].label.toLowerCase()} ({formatEval(live.evalAfter)})
+                  </p>
+                )}
               </div>
             )}
 
@@ -264,6 +302,18 @@ export default function Analysis() {
                     </div>
                   ))}
                 </div>
+
+                <table className="summary-table phase-table">
+                  <tbody>
+                    {phases.map((p) => (
+                      <tr key={p.phase}>
+                        <td className="num">{p.w === null ? '—' : p.w.toFixed(1)}</td>
+                        <td>Precisión en {p.phase}</td>
+                        <td className="num">{p.b === null ? '—' : p.b.toFixed(1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
                 <EvalGraph analysis={analysis} ply={ply} onSelect={go} />
 

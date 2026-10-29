@@ -2,7 +2,7 @@ import { Chess } from 'chess.js';
 import { evalToCp, isMistake, winPct, type Classification, type GameAnalysis } from './analysis';
 import type { BotStyle } from './style';
 
-type Phase = 'apertura' | 'medio juego' | 'final';
+export type Phase = 'apertura' | 'medio juego' | 'final';
 export const PHASES: Phase[] = ['apertura', 'medio juego', 'final'];
 
 export type GameSummary = {
@@ -28,7 +28,7 @@ export type GameSummary = {
 
 const NON_PAWN: Record<string, number> = { n: 3, b: 3, r: 5, q: 9 };
 
-function phaseOf(fen: string, ply: number): Phase {
+export function phaseOf(fen: string, ply: number): Phase {
   if (ply < 20) return 'apertura';
   let material = 0;
   for (const row of new Chess(fen).board()) for (const sq of row) if (sq) material += NON_PAWN[sq.type] ?? 0;
@@ -135,9 +135,8 @@ export function buildProfile(gs: GameSummary[]): Profile {
   const phases = PHASES.map((p) => {
     const sum = gs.reduce((s, g) => s + g.phase[p][0], 0);
     const cnt = gs.reduce((s, g) => s + g.phase[p][1], 0);
-    const inv = gs.reduce((s, g) => s + (g.phase[p][2] ?? 0), 0);
-    // Misma mezcla de media aritmética y armónica que la precisión de cada partida.
-    return { phase: p, accuracy: cnt >= 6 ? (sum / cnt + (inv ? cnt / inv : sum / cnt)) / 2 : null };
+    // Media aritmética, como la precisión de cada partida.
+    return { phase: p, accuracy: cnt >= 6 ? sum / cnt : null };
   });
 
   const aggr = avg(gs.map((g) => g.aggressive));

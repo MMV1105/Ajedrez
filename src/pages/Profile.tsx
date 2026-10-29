@@ -21,7 +21,7 @@ const CLASSES = [
 const DEPTH = 12;
 const DEPTH_SERVER = 16; // con el Stockfish completo del servidor se puede ir más hondo
 // Sube la versión cuando cambie la forma de puntuar, para no mezclar notas viejas y nuevas.
-const SUMMARIES_KEY = 'summaries10';
+const SUMMARIES_KEY = 'summaries11';
 
 export default function Profile() {
   const [source, setSource] = useState<'chesscom' | 'local'>('chesscom');
