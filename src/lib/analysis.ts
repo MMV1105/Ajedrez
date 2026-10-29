@@ -105,6 +105,10 @@ const GREAT_GAP = 0.15;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
 const SACRIFICE_POINTS = 2;
 const SACRIFICE_PLIES = 4;
+// Filtro de seguridad: por debajo de +3 tras la jugada se castiga la pérdida bruta de centipeones;
+// colgar una pieza (≥ 350 cp) nunca pasa de error aunque sigas ganando.
+const SAFE_ADVANTAGE = 300;
+const CPL_PIECE = 350;
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
@@ -116,10 +120,13 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const sign = color === 'w' ? 1 : -1;
   const cpBefore = sign * evalToCp(before);
   const cpAfter = sign * evalToCp(after);
-  const epBefore = expectedPoints(cpBefore); // EP de la mejor jugada
-  const epAfter = expectedPoints(cpAfter); // EP tras tu jugada
+  // Las evaluaciones se recortan a ±1000 cp: más allá, la victoria ya es trivial.
+  const cpB = clampCp(cpBefore);
+  const cpA = clampCp(cpAfter);
+  const epBefore = expectedPoints(cpB); // EP de la mejor jugada
+  const epAfter = expectedPoints(cpA); // EP tras tu jugada
   const epLoss = Math.max(0, epBefore - epAfter); // ΔEP
-  const cpLoss = Math.max(0, clampCp(cpBefore) - clampCp(cpAfter));
+  const cpLoss = Math.max(0, cpB - cpA); // CPL
   const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
   const uci = move.from + move.to + (move.promotion ?? '');
   const best = uci === before.best || epLoss === 0;
@@ -157,14 +164,21 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
     // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15.
     const second = before.second === null ? null : expectedPoints(sign * before.second);
     cls = second !== null && epBefore - second >= GREAT_GAP ? 'gran' : 'mejor';
-  } else if (epLoss <= LIMITS.excelente) cls = 'excelente';
-  else if (epLoss <= LIMITS.buena) cls = 'buena';
-  else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
-  else {
+  } else {
+    if (epLoss <= LIMITS.excelente) cls = 'excelente';
+    else if (epLoss <= LIMITS.buena) cls = 'buena';
+    else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
+    else if (epLoss <= LIMITS.error) cls = 'error';
+    else cls = 'grave';
+    // Filtro de seguridad por CPL: con mucha ventaja el ΔEP es pequeño aunque regales material.
+    if (cpA < SAFE_ADVANTAGE) {
+      if (cpLoss >= CPL_PIECE) cls = 'grave';
+      else if (cpLoss >= 200 && (cls === 'excelente' || cls === 'buena')) cls = 'error';
+      else if (cpLoss >= 100 && cls === 'excelente') cls = 'imprecision';
+    } else if (cpLoss >= CPL_PIECE && (cls === 'excelente' || cls === 'buena')) cls = 'error';
     // Ocasión fallada: el rival acababa de cometer un error grave y no lo castigas: devuelves lo que te había regalado.
     const prev = ctx.prevLoss ?? 0;
-    const missed = prev > LIMITS.error && epAfter >= epBefore - prev - 0.05;
-    cls = missed ? 'fallo' : epLoss <= LIMITS.error ? 'error' : 'grave';
+    if ((cls === 'error' || cls === 'grave') && prev > LIMITS.error && epAfter >= epBefore - prev - 0.05) cls = 'fallo';
   }
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
