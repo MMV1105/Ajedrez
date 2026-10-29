@@ -17,13 +17,17 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   (brillante, gran jugada, mejor, excelente, buena, teoría, imprecisión, error, ocasión fallada, error grave)
   con la mejor alternativa. La valoración sigue el modelo de puntos esperados, EP = 1 / (1 + 10^(−cp/1100)), anclado
   en la igualdad: los centipeones que pierdes frente a la mejor jugada (CPL) se miden como si la partida estuviera a 0,
-  con ΔEP = 0,5 − EP(−CPL), así que un error pesa igual vayas ganando, igualado o perdiendo (mejor = 0, excelente ≤ 0,02,
-  buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20; unos 38, 96, 194 y 405 cp). La escala de 1100 y la
-  precisión de cada jugada, 100·e^(−23,45·ΔEP) (100 si es la del motor), están ajustadas para dar las mismas notas y
-  precisiones que chess.com con Stockfish 19 a profundidad 18; la de la partida es la media aritmética. Brillante: ΔEP ≤ 0,02
-  dejando una pieza para que la coman (2 puntos netos o más) sin estar perdido; gran jugada: la única buena (la segunda pierde ≥ 0,15 de EP
-  real), sin contar recapturas; ocasión fallada: devolver lo que el rival regaló con un error, o dejar escapar un mate
-  forzado sin perder la posición ganadora (cuenta como perder un peón). Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
+  con ΔEP = 0,5 − EP(−CPL) (mejor = 0, excelente ≤ 0,02, buena ≤ 0,05, imprecisión ≤ 0,10, error ≤ 0,20, error grave > 0,20;
+  unos 38, 96, 194 y 405 cp). Si sigues ganando (o perdiendo) tras la jugada, lo perdido se divide por 1 + 0,2 por peón de
+  ventaja por encima de +2,5 (como mucho entre 2,5), y un mate vale como mucho 15 peones para la nota: un error se sigue
+  marcando, pero más suave que con la partida igualada. La precisión de cada jugada es 100·e^(−14·pérdida), con la pérdida
+  = 25 % la ΔEP anclada y 75 % la real (100 si es la del motor), y la de la partida es la media de sus raíces al cuadrado.
+  Todo está ajustado con partidas reales del autor: las notas coinciden con las de Chessigma en el 93 % de 4.200
+  jugadas (bien / imprecisión / error / grave; 97 % con la partida igualada) y la precisión se desvía unos 5 puntos de
+  chess.com (99 partidas, Stockfish 19 a profundidad 14) y 4,6 de Chessigma. Brillante: la mejor jugada dejando una pieza
+  para que la coman (2 puntos netos o más) sin estar perdido ni ganando ya de +6; gran jugada: la única buena (la segunda
+  pierde ≥ 0,12 de EP real), sin contar recapturas; ocasión fallada: devolver lo que el rival regaló con un error, o dejar
+  escapar un mate forzado sin perder la posición ganadora (cuenta como perder un peón). Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.
 - **Aperturas guiadas**: en tu turno, la mejor jugada con su porqué (o las 3 mejores con los centipeones que pierde
