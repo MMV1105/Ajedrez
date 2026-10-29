@@ -21,7 +21,7 @@ Todo se ejecuta en el navegador: Stockfish 19 (WASM, versión lite de un hilo) e
   centipeones que pierde frente a la mejor (CPL: excelente ≤ 20, buena ≤ 45, imprecisión ≤ 90, error ≤ 180) y cuenta
   la peor de las dos notas, así que perder ventaja penaliza igual vayas ganando, igualado o perdiendo. Brillante: ΔEP ≤ 0,02
   entregando al menos 2 puntos netos de material; gran jugada: la mejor, cuando la segunda tiene ΔEP ≥ 0,15;
-  ocasión fallada: no castigar un error grave del rival. La precisión de cada jugada es la menor entre 100·e^(−3,2·ΔEP) y 100·e^(−0,0046·CPL) (100 si es la del motor) y la de la
+  ocasión fallada: no castigar un error grave del rival. La precisión de cada jugada es la menor entre 100·e^(−3,2·ΔEP) y 100·e^(−0,0046·CPL) (100 si es la del motor). Dejar escapar un mate forzado sin perder la posición ganadora (sigues a +3 o más) es ocasión fallada y cuenta como perder un peón y la de la
   partida, la media aritmética. Además mide la **presión**: el porcentaje de jugadas que dejan al rival con una sola respuesta buena.
 - **Perfil de jugador**: analiza tus últimas partidas de chess.com (o contra los bots) y resume tu estilo,
   precisión por fase, aperturas, puntos fuertes y débiles. Puedes jugar contra un bot "clon" con tu estilo.

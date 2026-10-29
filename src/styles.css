@@ -919,6 +919,10 @@ input[type='checkbox'] {
   width: 40px;
   text-align: center;
 }
+.phase-table td:not(.num) {
+  text-align: center;
+  color: var(--muted);
+}
 .square-badge {
   position: absolute;
   border-radius: 50%;
