@@ -92,14 +92,19 @@ export function linesToEval(fen: string, lines: Line[]): PositionEval {
 // y la nota de la jugada sale de cuántos puntos esperados pierde frente a la mejor.
 // La pérdida se mide como si la partida estuviera igualada (anclada en 0): los centipeones que pierdes
 // frente a la mejor jugada (CPL) se llevan de 0 a −CPL, así que un error pesa igual vayas como vayas.
+// Escala de la curva: con 400 (la fórmula teórica) Stockfish 19 sale mucho más duro que chess.com; 1100 es la que
+// mejor reproduce las notas de chess.com en dos partidas de ~850 de Elo (coinciden 170 de 194 jugadas, 131 con 400).
+const EP_SCALE = 1100;
 export function expectedPoints(cp: number) {
-  return 1 / (1 + Math.pow(10, -cp / 400));
+  return 1 / (1 + Math.pow(10, -cp / EP_SCALE));
 }
 
 // Pérdida máxima de puntos esperados (ΔEP) para cada nota; por encima de la última, error grave.
 const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
-// Precisión de cada jugada: 100·e^(−k·ΔEP) con k = 3,2 (0,02 → 94, 0,05 → 85, 0,10 → 72, 0,20 → 52).
-const ACCURACY_K = 3.2;
+// Precisión de cada jugada: 100·e^(−k·ΔEP). k = 23,45 es el que reproduce la precisión de chess.com en las dos
+// partidas de calibración (chess.com 70,5 / 59,9 y 80,7 / 74,3; aquí 69,9 / 60,9 y 81,8 / 72,4).
+// 20 cp perdidos → 78, 1 peón → 29.
+const ACCURACY_K = 23.45;
 // Gran jugada: la segunda mejor pierde al menos esto.
 const GREAT_GAP = 0.15;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
@@ -109,13 +114,19 @@ const SACRIFICE_PLIES = 4;
 // y la precisión se calcula como si perdieras un peón.
 const MISSED_MATE_WINNING = 300;
 const MISSED_MATE_CPL = 100;
-// ΔEP anclado en 0: 0,5 − EP(−CPL). Los límites equivalen a unos 14, 35, 70 y 147 cp perdidos.
+// ΔEP anclado en 0: 0,5 − EP(−CPL). Con la escala de 1100, los límites equivalen a unos 38, 96, 194 y 405 cp perdidos.
 export const anchoredLoss = (cpl: number) => 0.5 - expectedPoints(-cpl);
 
 export type MoveContext = {
   inBook?: boolean; // la jugada es de teoría y la partida sigue en el libro
-  prevLoss?: number; // ΔEP (anclado) de la jugada anterior del rival
+  prevCpLoss?: number; // centipeones que perdió el rival en su jugada anterior
+  prevCapture?: string; // casilla donde comió el rival en su jugada anterior, si comió
 };
+
+// Ocasión fallada tras un regalo del rival: devuelves al menos el 70 % de lo que regaló sin quedar más de 100 cp
+// peor que antes del regalo (si te hundes más, es un error grave normal). Ajustado con las notas de chess.com.
+const MISS_GIVEBACK = 0.7;
+const MISS_MARGIN = 100;
 
 export function judgeMove(move: Move, before: PositionEval, after: PositionEval, ctx: MoveContext = {}) {
   const color = move.color;
@@ -134,24 +145,24 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   const epLoss = best ? 0 : anchoredLoss(cpLoss); // ΔEP como si la partida estuviera igualada
   const accuracy = 100 * Math.exp(-ACCURACY_K * epLoss);
 
-  // Sacrificio: tras la línea del motor (o al acabar en tu mate) has entregado al menos 2 puntos netos de material.
+  // Sacrificio: dejas una pieza para que la coman (tras su respuesta pierdes 2 puntos netos o más y no recuperas
+  // en esa misma casilla) o, tras la línea del motor (o al acabar en tu mate), has entregado 2 puntos netos o más.
   const sacrifice = () => {
     if (!after.pv.length) return false;
     try {
+      const [reply, next] = after.pv;
+      const r = new Chess(move.after);
+      r.move({ from: reply.slice(0, 2), to: reply.slice(2, 4), promotion: reply[4] });
+      const hanging = materialFor(r.fen(), color) - materialFor(move.before, color) <= -SACRIFICE_POINTS;
+      if (hanging && (!next || next.slice(2, 4) !== reply.slice(2, 4))) return true;
       const line = new Chess(move.after);
       for (const u of after.pv.slice(0, SACRIFICE_PLIES)) {
         line.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
         if (line.isCheckmate()) break;
       }
-      const mated = line.isCheckmate() && line.turn() !== color;
+      // Mate tras entregar material: cuenta lo que el rival llegó a comer antes del mate.
+      if (line.isCheckmate() && line.turn() !== color) return hanging;
       const net = materialFor(line.fen(), color) - materialFor(move.before, color);
-      if (mated) {
-        // Mate tras entregar material: se mira lo que el rival llegó a comer antes del mate.
-        const reply = new Chess(move.after);
-        const u = after.pv[0];
-        reply.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
-        return materialFor(reply.fen(), color) - materialFor(move.before, color) <= -SACRIFICE_POINTS;
-      }
       return after.pv.length >= SACRIFICE_PLIES && net <= -SACRIFICE_POINTS;
     } catch {
       return false; // línea del motor no aplicable
@@ -161,22 +172,25 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   let cls: Classification;
   if (ctx.inBook && epLoss <= LIMITS.buena) cls = 'teoria';
   else if (missedMate) cls = 'fallo';
-  // Brillante: ΔEP ≤ 0,02 (la posición no empeora) y entrega material.
-  else if (epLoss <= LIMITS.excelente && sacrifice()) cls = 'brillante';
+  // Brillante: ΔEP ≤ 0,02 (la posición no empeora) y entrega material; no cuenta si ya te están dando mate.
+  else if (epLoss <= LIMITS.excelente && !(before.mate !== null && sign * before.mate < 0) && sacrifice()) cls = 'brillante';
   else if (best) {
     // Gran jugada: la mejor, y la segunda mejor opción tiene ΔEP ≥ 0,15 (con la evaluación real:
     // es la única jugada que mantiene el resultado).
     const second = before.second === null ? null : expectedPoints(sign * before.second);
-    cls = second !== null && epBefore - second >= GREAT_GAP ? 'gran' : 'mejor';
+    // Recuperar la pieza que te acaban de comer no cuenta: es obvio aunque sea la única.
+    const recapture = !!move.captured && move.to === ctx.prevCapture;
+    cls = second !== null && epBefore - second >= GREAT_GAP && !recapture ? 'gran' : 'mejor';
   } else {
     if (epLoss <= LIMITS.excelente) cls = 'excelente';
     else if (epLoss <= LIMITS.buena) cls = 'buena';
     else if (epLoss <= LIMITS.imprecision) cls = 'imprecision';
     else if (epLoss <= LIMITS.error) cls = 'error';
     else cls = 'grave';
-    // Ocasión fallada: el rival acababa de cometer un error grave y no lo castigas: devuelves lo que te había regalado.
-    const prev = ctx.prevLoss ?? 0;
-    if ((cls === 'error' || cls === 'grave') && prev > LIMITS.error && epLoss <= prev + 0.05) cls = 'fallo';
+    // Ocasión fallada: el rival acababa de cometer un error (o algo peor) y no lo castigas: devuelves lo que te había regalado.
+    const gift = ctx.prevCpLoss ?? 0;
+    if ((cls === 'error' || cls === 'grave') && anchoredLoss(gift) > LIMITS.imprecision && cpLoss >= MISS_GIVEBACK * gift && cpLoss <= gift + MISS_MARGIN)
+      cls = 'fallo';
   }
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
@@ -217,7 +231,12 @@ export async function analyzeGame(
       const uci = move.from + move.to + (move.promotion ?? '');
       // La teoría solo cuenta mientras la partida no ha salido del libro.
       inTheory = inTheory && bookMoves(book!, move.before).some((m) => m.uci === uci);
-      const judged = judgeMove(move, evals[k], evals[i], { inBook: inTheory, prevLoss: moves[k - 1]?.epLoss });
+      const prev = moves[k - 1];
+      const judged = judgeMove(move, evals[k], evals[i], {
+        inBook: inTheory,
+        prevCpLoss: prev?.cpLoss,
+        prevCapture: prev?.move.captured ? prev.move.to : undefined,
+      });
       moves.push({ move, fenBefore: move.before, fenAfter: move.after, color: move.color, evalBefore: evals[k], evalAfter: evals[i], ...judged });
     }
     onProgress(i + 1, fens.length, moves);
