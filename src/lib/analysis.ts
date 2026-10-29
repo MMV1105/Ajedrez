@@ -101,14 +101,14 @@ export function expectedPoints(cp: number) {
 
 // Pérdida máxima de puntos esperados (ΔEP) para cada nota; por encima de la última, error grave.
 const LIMITS = { excelente: 0.02, buena: 0.05, imprecision: 0.1, error: 0.2 };
-// Precisión de cada jugada: 100·e^(−k·pérdida), con la pérdida = 10 % la ΔEP anclada en 0 y 90 % la ΔEP real
-// (la que pierdes según cómo va la partida, con la curva más suave de escala 1300); 100 si es la del motor o teoría.
-// k, el reparto, la escala y la media de la partida (abajo) están ajustados solo con chess.com, en 99 partidas
-// reales: se desvía 4,6 de media (5,2 antes; 4,7 en partidas que no se usaron para ajustar).
-// Igualados: 20 cp perdidos → 89, 1 peón → 54, 2 peones → 30.
-const ACCURACY_K = 13.5;
-const ANCHOR_WEIGHT = 0.1;
-const REAL_SCALE = 1300;
+// Precisión de cada jugada: 100·e^(−k·pérdida), con la pérdida = la ΔEP real (la que pierdes según cómo va la
+// partida, con una curva de escala 1160 en la que un mate a favor vale 1 y uno en contra 0), más 0,061 si la
+// jugada empeora el estado de mate (dejas escapar un mate o permites que te lo den). 100 si es la del motor o teoría.
+// Todo ajustado solo con chess.com en 147 partidas reales y comprobado en otras 59 que no se usaron para ajustar:
+// se desvía 4,4 de media en esas 59 (4,6 con la fórmula anterior). Igualados: 20 cp perdidos → 88, 1 peón → 53.
+const ACCURACY_K = 13;
+const REAL_SCALE = 1160;
+const MATE_STATE_LOSS = 0.061;
 // Gran jugada: la segunda mejor pierde al menos esto (ajustado con 4.200 jugadas de Chessigma).
 const GREAT_GAP = 0.12;
 // Brillante: material neto entregado (en puntos) y jugadas de la línea del motor que se miran para medirlo.
@@ -221,9 +221,11 @@ export function judgeMove(move: Move, before: PositionEval, after: PositionEval,
   // Presión: tras la jugada, el rival solo tiene una respuesta que no empeora su posición.
   const decided = Math.abs(evalToCp(after)) > 600;
   const pressure = !decided && after.goodMoves === 1 && new Chess(move.after).moves().length > 1;
-  const realEp = (cp: number) => 1 / (1 + Math.pow(10, -cp / REAL_SCALE));
-  const realLoss = best ? 0 : Math.max(0, realEp(cpBefore) - realEp(cpAfter));
-  const accuracy = cls === 'teoria' ? 100 : 100 * Math.exp(-ACCURACY_K * (ANCHOR_WEIGHT * epLoss + (1 - ANCHOR_WEIGHT) * realLoss));
+  const realEp = (e: PositionEval, cp: number) => (e.mate !== null ? (cp > 0 ? 1 : 0) : 1 / (1 + Math.pow(10, -cp / REAL_SCALE)));
+  const mateState = (e: PositionEval, cp: number) => (e.mate === null ? 0 : cp > 0 ? 1 : -1);
+  const realLoss = Math.max(0, realEp(before, cpBefore) - realEp(after, cpAfter));
+  const mateLoss = mateState(before, cpBefore) > mateState(after, cpAfter) ? MATE_STATE_LOSS : 0;
+  const accuracy = cls === 'teoria' || best ? 100 : 100 * Math.exp(-ACCURACY_K * (realLoss + mateLoss));
   return { epBefore, epAfter, epLoss, cpLoss, accuracy, cls, pressure };
 }
 
